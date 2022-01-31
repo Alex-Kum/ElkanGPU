@@ -1,5 +1,5 @@
-#ifndef ELKAN_KMEANS_H
-#define ELKAN_KMEANS_H
+#ifndef FB1_ELKAN_KMEANS_H
+#define FB1_ELKAN_KMEANS_H
 
 /* Authors: Greg Hamerly and Jonathan Drake
  * Feedback: hamerly@cs.baylor.edu
@@ -13,13 +13,14 @@
 
 #include "triangle_inequality_base_kmeans.h"
 
-class ElkanKmeans : public TriangleInequalityBaseKmeans {
+class FB1_ElkanKmeans : public TriangleInequalityBaseKmeans {
 public:
-    ElkanKmeans() : centerCenterDistDiv2(NULL) {}
-    virtual ~ElkanKmeans() { free(); }
+    FB1_ElkanKmeans() : centerCenterDistDiv2(NULL) {}
+    //ElkanKmeans_newbound() : oldcenterCenterDistDiv2(NULL) {}
+    virtual ~FB1_ElkanKmeans() { free(); }
     virtual void free();
     virtual void initialize(Dataset const* aX, unsigned short aK, unsigned short* initialAssignment, int aNumThreads);
-    virtual std::string getName() const { return "elkan"; }
+    virtual std::string getName() const { return "fbelkan"; }
 
 protected:
     virtual int runThread(int threadId, int maxIterations);
@@ -33,9 +34,13 @@ protected:
     // Keep track of the distance (divided by 2) between each pair of
     // points.
     double* centerCenterDistDiv2;
+    double* oldcenter2newcenterDis;
+    double* oldcenters;
+    //double *lower2;
     double* lower;
-    double* d_centerCenterDistDiv2;
-    double* d_lower;
+    double* ub_old;
+    int move_centers_newbound(double* oldcenters, double* oldcenter2newcenterDis);
+
 };
 
 #endif

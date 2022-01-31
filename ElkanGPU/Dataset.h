@@ -31,21 +31,12 @@ public:
 
     // construct a dataset of a particular size, and determine whether to
     // keep the sumDataSquared
-    Dataset(int aN, int aD, bool keepSDS = false) {
-        cudaMallocManaged(&n, 1 * sizeof(int));
-        cudaMallocManaged(&d, 1 * sizeof(int));
-        cudaMallocManaged(&nd, 1 * sizeof(int));
-        *n = aN;
-        *d = aD;
-        *nd = *n * *d;
-        cudaMallocManaged(&data, *nd * sizeof(double));
-        if (keepSDS) {
-            cudaMallocManaged(&sumDataSquared, *nd * sizeof(double));
+    Dataset(int aN, int aD, bool keepSDS = false) : n(aN), d(aD), nd(n* d), data(new double[nd]),
+        sumDataSquared(keepSDS ? new double[n] : NULL) {
+        auto i = cudaMalloc(&d_data, nd * sizeof(double));     
+        if (i != cudaSuccess) {
+            std::cout << "cudaMalloc failed (data)" << std::endl;
         }
-        else {
-            sumDataSquared = nullptr;
-        }
-        
     }
 
     // copy constructor -- makes a deep copy of everything in x
@@ -53,11 +44,13 @@ public:
 
     // destroys the dataset safely
     ~Dataset() {
-        cudaFree(n);
-        cudaFree(d);
-        cudaFree(nd);
-        cudaFree(data);
-        cudaFree(sumDataSquared);
+        //delete data;
+        n = d = nd = 0;
+        double* dp = data, * sdsp = sumDataSquared;
+        data = sumDataSquared = NULL;
+        delete[] dp;
+        delete[] sdsp;
+        cudaFree(d_data);
     }
 
     // operator= is the standard deep-copy assignment operator, which
@@ -80,14 +73,13 @@ public:
     // n represents the number of records
     // d represents the dimension
     // nd is a shortcut for the value n * d
-    int* n;
-    int* d;
-    int* nd;
+    int n, d, nd;
 
     // data is an array of length n*d that stores all of the records in
     // record-major (row-major) order. Thus data[0]...data[d-1] are the
     // values associated with the first record.
     double* data;
+    double* d_data;
 
     // sumDataSquared is an (optional) sum of squared values for every
     // record. Thus, 
@@ -97,4 +89,5 @@ public:
     // field, but that the Dataset class does NOT automatically populate or
     // update the values in sumDataSquared.
     double* sumDataSquared;
+
 };

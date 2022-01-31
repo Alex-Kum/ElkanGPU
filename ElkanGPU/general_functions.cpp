@@ -41,38 +41,41 @@ double distance2silent(double const* a, double const* b, int d) {
 
 
 void centerDataset(Dataset* x) {
-    double* xCentroid = new double[*x->d];
+    double* xCentroid = new double[x->d];
 
-    for (int d = 0; d < *x->d; ++d) {
+    for (int d = 0; d < x->d; ++d) {
         xCentroid[d] = 0.0;
     }
 
-    for (int i = 0; i < *x->n; ++i) {
-        addVectors(xCentroid, x->data + i * *x->d, *x->d);
+    for (int i = 0; i < x->n; ++i) {
+        addVectors(xCentroid, x->data + i * x->d, x->d);
     }
 
     // compute average (divide by n)
-    for (int d = 0; d < *x->d; ++d) {
-        xCentroid[d] /= *x->n;
+    for (int d = 0; d < x->d; ++d) {
+        xCentroid[d] /= x->n;
     }
 
     // re-center the dataset
-    const double* xEnd = x->data + *x->n * *x->d;
-    for (double* xp = x->data; xp != xEnd; xp += *x->d) {
-        subVectors(xp, xCentroid, *x->d);
+    const double* xEnd = x->data + x->n * x->d;
+    for (double* xp = x->data; xp != xEnd; xp += x->d) {
+        subVectors(xp, xCentroid, x->d);
     }
 
     delete[] xCentroid;
 }
 
 Dataset* init_centers(Dataset const& x, unsigned short k) {
+    //srand(time(NULL));
     int* chosen_pts = new int[k];
-    Dataset* c = new Dataset(k, *x.d);
+    Dataset* c = new Dataset(k, x.d);
     for (int i = 0; i < k; ++i) {
         bool acceptable = true;
         do {
             acceptable = true;
-            chosen_pts[i] = rand() % *x.n;
+            auto ran = rand() % x.n;
+            //std::cout << "Rand: " << i << " = " << ran << std::endl;
+            chosen_pts[i] = ran;
             for (int j = 0; j < i; ++j) {
                 if (chosen_pts[i] == chosen_pts[j]) {
                     acceptable = false;
@@ -80,8 +83,8 @@ Dataset* init_centers(Dataset const& x, unsigned short k) {
                 }
             }
         } while (!acceptable);
-        double* cdp = c->data + i * *x.d;
-        memcpy(cdp, x.data + chosen_pts[i] * *x.d, sizeof(double) * *x.d);
+        double* cdp = c->data + i * x.d;
+        memcpy(cdp, x.data + chosen_pts[i] * x.d, sizeof(double) * x.d);
         //if (c->sumDataSquared) {
         //    c->sumDataSquared[i] = std::inner_product(cdp, cdp + *x.d, cdp, 0.0);
         //}
@@ -95,26 +98,26 @@ Dataset* init_centers(Dataset const& x, unsigned short k) {
 
 Dataset* init_centers_kmeanspp(Dataset const& x, unsigned short k) {
     int* chosen_pts = new int[k];
-    std::pair<double, int>* dist2 = new std::pair<double, int>[*x.n];
-    double* distribution = new double[*x.n];
+    std::pair<double, int>* dist2 = new std::pair<double, int>[x.n];
+    double* distribution = new double[x.n];
 
     // initialize dist2
-    for (int i = 0; i < *x.n; ++i) {
+    for (int i = 0; i < x.n; ++i) {
         dist2[i].first = std::numeric_limits<double>::max();
         dist2[i].second = i;
     }
 
     // choose the first point randomly
     int ndx = 1;
-    chosen_pts[ndx - 1] = rand() % *x.n;
+    chosen_pts[ndx - 1] = rand() % x.n;
 
     while (ndx < k) {
         double sum_distribution = 0.0;
         // look for the point that is furthest from any center
-        for (int i = 0; i < *x.n; ++i) {
+        for (int i = 0; i < x.n; ++i) {
             int example = dist2[i].second;
             double d2 = 0.0, diff;
-            for (int j = 0; j < *x.d; ++j) {
+            for (int j = 0; j < x.d; ++j) {
                 diff = x(example, j) - x(chosen_pts[ndx - 1], j);
                 d2 += diff * diff;
             }
@@ -126,17 +129,17 @@ Dataset* init_centers_kmeanspp(Dataset const& x, unsigned short k) {
         }
 
         // sort the examples by their distance from centers
-        sort(dist2, dist2 + *x.n);
+        sort(dist2, dist2 + x.n);
 
         // turn distribution into a CDF
         distribution[0] = dist2[0].first / sum_distribution;
-        for (int i = 1; i < *x.n; ++i) {
+        for (int i = 1; i < x.n; ++i) {
             distribution[i] = distribution[i - 1] + dist2[i].first / sum_distribution;
         }
 
         // choose a random interval according to the new distribution
         double r = (double)rand() / (double)RAND_MAX;
-        double* new_center_ptr = std::lower_bound(distribution, distribution + *x.n, r);
+        double* new_center_ptr = std::lower_bound(distribution, distribution + x.n, r);
         int distribution_ndx = (int)(new_center_ptr - distribution);
         chosen_pts[ndx] = dist2[distribution_ndx].second;
         /*
@@ -148,14 +151,11 @@ Dataset* init_centers_kmeanspp(Dataset const& x, unsigned short k) {
         ++ndx;
     }
 
-    Dataset* c = new Dataset(k, *x.d);
+    Dataset* c = new Dataset(k, x.d);
 
     for (int i = 0; i < k; ++i) {
-        double* cdp = c->data + i * (*x.d);
-        memcpy(cdp, x.data + chosen_pts[i] * (*x.d), sizeof(double) * *x.d);
-        if (c->sumDataSquared) {
-            c->sumDataSquared[i] = std::inner_product(cdp, cdp + *x.d, cdp, 0.0);
-        }
+        double* cdp = c->data + i * (x.d);
+        memcpy(cdp, x.data + chosen_pts[i] * (x.d), sizeof(double) * x.d);        
     }
 
     delete[] chosen_pts;
@@ -168,26 +168,26 @@ Dataset* init_centers_kmeanspp(Dataset const& x, unsigned short k) {
 
 Dataset* init_centers_kmeanspp_v2(Dataset const& x, unsigned short k) {
     int* chosen_pts = new int[k];
-    std::pair<double, int>* dist2 = new std::pair<double, int>[*x.n];
+    std::pair<double, int>* dist2 = new std::pair<double, int>[x.n];
 
     // initialize dist2
-    for (int i = 0; i < *x.n; ++i) {
+    for (int i = 0; i < x.n; ++i) {
         dist2[i].first = std::numeric_limits<double>::max();
         dist2[i].second = i;
     }
 
     // choose the first point randomly
     int ndx = 1;
-    chosen_pts[ndx - 1] = rand() % *x.n;
+    chosen_pts[ndx - 1] = rand() % x.n;
 
     while (ndx < k) {
         double sum_distribution = 0.0;
         // look for the point that is furthest from any center
         double max_dist = 0.0;
-        for (int i = 0; i < *x.n; ++i) {
+        for (int i = 0; i < x.n; ++i) {
             int example = dist2[i].second;
             double d2 = 0.0, diff;
-            for (int j = 0; j < *x.d; ++j) {
+            for (int j = 0; j < x.d; ++j) {
                 diff = x(example, j) - x(chosen_pts[ndx - 1], j);
                 d2 += diff * diff;
             }
@@ -222,13 +222,11 @@ Dataset* init_centers_kmeanspp_v2(Dataset const& x, unsigned short k) {
         ++ndx;
     }
 
-    Dataset* c = new Dataset(k, *x.d);
-    for (int i = 0; i < *c->n; ++i) {
-        double* cdp = c->data + i * *x.d;
-        memcpy(cdp, x.data + chosen_pts[i] * *x.d, sizeof(double) * *x.d);
-        if (c->sumDataSquared) {
-            c->sumDataSquared[i] = std::inner_product(cdp, cdp + *x.d, cdp, 0.0);
-        }
+    Dataset* c = new Dataset(k, x.d);
+    for (int i = 0; i < c->n; ++i) {
+        double* cdp = c->data + i * x.d;
+        memcpy(cdp, x.data + chosen_pts[i] * x.d, sizeof(double) * x.d);
+        
     }
 
     delete[] chosen_pts;
@@ -266,12 +264,12 @@ double getMemoryUsage() {
 
 
 void assign(Dataset const& x, Dataset const& c, unsigned short* assignment) {
-    for (int i = 0; i < *x.n; ++i) {
+    for (int i = 0; i < x.n; ++i) {
         double shortestDist2 = std::numeric_limits<double>::max();
         int closest = 0;
-        for (int j = 0; j < *c.n; ++j) {
-            double d2 = 0.0, * a = x.data + i * *x.d, * b = c.data + j * *x.d;
-            for (; a != x.data + (i + 1) * *x.d; ++a, ++b) {
+        for (int j = 0; j < c.n; ++j) {
+            double d2 = 0.0, * a = x.data + i * x.d, * b = c.data + j * x.d;
+            for (; a != x.data + (i + 1) * x.d; ++a, ++b) {
                 d2 += (*a - *b) * (*a - *b);
             }
             if (d2 < shortestDist2) {

@@ -78,14 +78,18 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="elkan_kmean.cu" />
+    <CudaCompile Include="FB1_elkan_kmeans.cu" />
     <CudaCompile Include="kernel.cu" />
+    <CudaCompile Include="MO_elkan_kmeans.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Dataset.h" />
     <ClInclude Include="elkan_kmean.h" />
+    <ClInclude Include="FB1_elkan_kmeans.h" />
     <ClInclude Include="general_functions.h" />
     <ClInclude Include="gpufunctions.h" />
     <ClInclude Include="kmeans.h" />
+    <ClInclude Include="MO_elkan_kmeans.h" />
     <ClInclude Include="original_space_kmeans.h" />
     <ClInclude Include="triangle_inequality_base_kmeans.h" />
   </ItemGroup>

@@ -28,10 +28,12 @@ protected:
 
     // Half the distance between each center and its closest other center.
     double* s;
+    double* d_s;
 
     // One upper bound for each point on the distance between that point and
     // its assigned (closest) center.
     double* upper;
+    double* d_upper;
 
     // Lower bound(s) for each point on the distance between that point and
     // the centers being tracked for lower bounds, which may be 1 to k.

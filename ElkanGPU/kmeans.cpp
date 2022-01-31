@@ -20,12 +20,17 @@ clusterSize(NULL), centerMovement(NULL), assignment(NULL) {
 void Kmeans::free() {
     if (counter == 0) {
         //std::cout << "kmeans free" << std::endl;
-        cudaFree(centerMovement);
+        delete centerMovement;
+        cudaFree(d_centerMovement);
         for (int t = 0; t < numThreads; ++t) {
+            //if (d_clusterSize[t] != nullptr)
+            //    cudaFree(d_clusterSize[t]);
             if (clusterSize[t] != nullptr)
-                cudaFree(clusterSize[t]);
+                delete clusterSize[t];
         }
-        cudaFree(clusterSize);
+        cudaFree(d_clusterSize);
+        delete[] clusterSize;
+
         cublasDestroy(cublas_handle);
         centerMovement = NULL;
         clusterSize = NULL;
@@ -42,8 +47,8 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
     std::cout << "kmeans init" << std::endl;
     converged = false;
     x = aX;
-    n = *x->n;
-    d = *x->d;
+    n = x->n;
+    d = x->d;
     k = aK;
     stat = cublasCreate(&cublas_handle);
     //std::cout << n << "\n";
@@ -55,13 +60,19 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
 #endif
 
     assignment = initialAssignment;
-    //centerMovement = new double[k];
-    cudaMallocManaged(&centerMovement, k * sizeof(double));
-    //clusterSize = new int* [numThreads];
-    cudaMallocManaged(&clusterSize, numThreads * sizeof(int*));
+    centerMovement = new double[k];
+    auto a = cudaMalloc(&d_centerMovement, k * sizeof(double));
+    if (a != cudaSuccess) {
+        std::cout << "cudaMalloc failed (centerMovement)" << std::endl;
+    }
+    clusterSize = new int* [numThreads];
+    auto c = cudaMalloc(&d_clusterSize, k * sizeof(int));
+    if (c != cudaSuccess) {
+        std::cout << "cudaMalloc failed (clusterSize[])" << std::endl;
+    }
     for (int t = 0; t < numThreads; ++t) {
-        //clusterSize[t] = new int[k];
-        cudaMallocManaged(&clusterSize[t], k * sizeof(int));
+        clusterSize[t] = new int[k];
+        
         std::fill(clusterSize[t], clusterSize[t] + k, 0);
         for (int i = start(t); i < end(t); ++i) {
             assert(assignment[i] < k);
@@ -78,7 +89,9 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
 void Kmeans::changeAssignment(int xIndex, int closestCluster, int threadId) {
     --clusterSize[threadId][assignment[xIndex]];
     ++clusterSize[threadId][closestCluster];
+   
     assignment[xIndex] = closestCluster;
+    
 }
 #ifdef USE_THREADS
 struct ThreadInfo {

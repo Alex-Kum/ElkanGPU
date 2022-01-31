@@ -52,7 +52,7 @@ int OriginalSpaceKmeans::move_centers() {
             }
         }
         centerMovement[j] = sqrt(centerMovement[j]);
-
+       // std::cout << "center 3: " << centerMovement[furthestMovingCenter] <<  std::endl;
         if (centerMovement[furthestMovingCenter] < centerMovement[j]) {
             furthestMovingCenter = j;
         }
@@ -66,6 +66,7 @@ int OriginalSpaceKmeans::move_centers() {
 }
 
 void OriginalSpaceKmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* initialAssignment, int aNumThreads) {
+    std::cout << "originalSpaceKmeans init" << std::endl;
     Kmeans::initialize(aX, aK, initialAssignment, aNumThreads);
 
     centers = new Dataset(k, d);
@@ -98,6 +99,7 @@ void OriginalSpaceKmeans::changeAssignment(int xIndex, int closestCluster, int t
 
     subVectors(sumNewCenters[threadId]->data + oldAssignment * d, xp, d);
     addVectors(sumNewCenters[threadId]->data + closestCluster * d, xp, d);
+
 }
 
 double OriginalSpaceKmeans::pointPointInnerProduct(int x1, int x2) const {

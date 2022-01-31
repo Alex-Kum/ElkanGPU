@@ -12,8 +12,10 @@
 
 void TriangleInequalityBaseKmeans::free() {
     OriginalSpaceKmeans::free();
-    cudaFree(s);
-    cudaFree(upper);
+    //cudaFree(d_s);
+    //cudaFree(d_upper);
+    delete s;
+    delete upper;
     //delete [] lower;
     //delete [] lower2;
     //delete [] lower3;
@@ -68,12 +70,19 @@ void TriangleInequalityBaseKmeans::update_s(int threadId) {
  * Return value: none
  */
 void TriangleInequalityBaseKmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* initialAssignment, int aNumThreads) {
+    std::cout << "triangleineququalitybasekmeans init" << std::endl;
     OriginalSpaceKmeans::initialize(aX, aK, initialAssignment, aNumThreads);
 
-    //s = new double[k];
-    cudaMallocManaged(&s, k * sizeof(double));
-    //upper = new double[n];
-    cudaMallocManaged(&upper, n * sizeof(double));
+    s = new double[k];
+    auto j = cudaMalloc(&d_s, k * sizeof(double));
+    if (j != cudaSuccess) {
+        std::cout << "cudaMalloc failed (s)" << std::endl;
+    }
+    upper = new double[n];
+   auto k = cudaMalloc(&d_upper, n * sizeof(double));
+    if (k != cudaSuccess) {
+        std::cout << "cudaMalloc failed (upper)" << std::endl;
+    }
 
 
     //lower = new double[n * numLowerBounds];

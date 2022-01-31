@@ -1,5 +1,5 @@
-#ifndef ELKAN_KMEANS_H
-#define ELKAN_KMEANS_H
+#ifndef MO_ELKAN_KMEANS_H
+#define MO_ELKAN_KMEANS_H
 
 /* Authors: Greg Hamerly and Jonathan Drake
  * Feedback: hamerly@cs.baylor.edu
@@ -13,13 +13,14 @@
 
 #include "triangle_inequality_base_kmeans.h"
 
-class ElkanKmeans : public TriangleInequalityBaseKmeans {
+class MO_ElkanKmeans : public TriangleInequalityBaseKmeans {
 public:
-    ElkanKmeans() : centerCenterDistDiv2(NULL) {}
-    virtual ~ElkanKmeans() { free(); }
+    MO_ElkanKmeans() : centerCenterDistDiv2(NULL) {}
+    //ElkanKmeans_newbound() : oldcenterCenterDistDiv2(NULL) {}
+    virtual ~MO_ElkanKmeans() { free(); }
     virtual void free();
     virtual void initialize(Dataset const* aX, unsigned short aK, unsigned short* initialAssignment, int aNumThreads);
-    virtual std::string getName() const { return "elkan"; }
+    virtual std::string getName() const { return "MO_elkan"; }
 
 protected:
     virtual int runThread(int threadId, int maxIterations);
@@ -33,10 +34,13 @@ protected:
     // Keep track of the distance (divided by 2) between each pair of
     // points.
     double* centerCenterDistDiv2;
-    double* lower;
-    double* d_centerCenterDistDiv2;
-    double* d_lower;
+    double* oldcenter2newcenterDis;
+    double* oldcenters;
+    double* ub_old;
+    double* oldcenterCenterDistDiv2;
+    int move_centers2(int* sortindex, bool sorting, bool* nochanged);
+    int move_centers_newbound(double* oldcenters, double* oldcenter2newcenterDis);
+
 };
 
 #endif
-

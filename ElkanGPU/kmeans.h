@@ -127,15 +127,18 @@ protected:
     // Keep track of how many points are in each cluster, divided over each
     // thread.
     int** clusterSize;
+    int* d_clusterSize;
 
     // centerMovement is computed in move_centers() and used to detect
     // convergence (if max(centerMovement) == 0.0) and update point-center
     // distance bounds (in subclasses that use them).
     double* centerMovement;
+    double* d_centerMovement;
 
     // For each point in x, keep which cluster it is assigned to. By using a
     // short, we assume a limited number of clusters (fewer than 2^16).
     unsigned short* assignment;
+    unsigned short* d_assignment;
 
 
     // This is where each thread does its work.
