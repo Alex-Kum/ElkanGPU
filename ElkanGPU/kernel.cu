@@ -25,6 +25,7 @@ cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size);
 __global__ void addKernel(int *c, const int *a, const int *b)
 {
     int i = threadIdx.x;
+    printf("add: %i\n", a[i]);
     c[i] = a[i] + b[i];
 }
 
@@ -32,6 +33,14 @@ __global__ void multiplyKernel(const float* a, const float* b, float* c) {
     int i = threadIdx.x;
     if (i < 5) {
         c[i] = a[i] * b[i];
+    }
+}
+
+__global__ void setTestt(int* test, unsigned short* arr1, unsigned short* arr2) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < 1000) {
+        arr2[i] = arr1[i];
+        test[i] = 5;        
     }
 }
 
@@ -90,18 +99,123 @@ std::mt19937 gen(rd());
 std::uniform_real_distribution<> dis(0.1, 100.0);
 
 int main()
-{    
-   
-
+{           
     cudaSetDevice(0);
+
+    /*const int streamSize = 200;
+    const int nStreams = 5;
+    cudaStream_t stream[nStreams];
+    for (int i = 0; i < nStreams; i++)
+        cudaStreamCreate(&stream[i]);
+
+    const int n = 1000;
+    int* arr1 = new int[n];
+    int* d_arr1;
+    auto f = cudaMalloc(&d_arr1, n * sizeof(int));
+    if (f != cudaSuccess) {
+        std::cout << "cudaMalloc failed (arr1)" << std::endl;
+    }
+
+    int* arr2 = new int[n];
+    int* d_arr2;
+    f = cudaMalloc(&d_arr2, n * sizeof(int));
+    if (f != cudaSuccess) {
+        std::cout << "cudaMalloc failed (arr2)" << std::endl;
+    }
+
+    int* arr3 = new int[n];
+    int* d_arr3;
+    f = cudaMalloc(&d_arr3, n * sizeof(int));
+    if (f != cudaSuccess) {
+        std::cout << "cudaMalloc failed (arr2)" << std::endl;
+    }
+
+    for (int i = 0; i < n; i++) {
+        arr1[i] = i;
+        arr2[i] = i;
+    }
+
+    int blockSize = 1 * 32;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+    cudaHostRegister(arr1, n * sizeof(int), cudaHostRegisterDefault);
+    cudaHostRegister(arr2, n * sizeof(int), cudaHostRegisterDefault);
+    cudaHostRegister(arr3, n * sizeof(int), cudaHostRegisterDefault);
+
+    for (int i = 0; i < nStreams; i++) {
+        int offset = i * streamSize;
+        cudaMemcpyAsync(&d_arr1[offset], &arr1[offset], n * sizeof(double) / nStreams, cudaMemcpyHostToDevice, stream[i]);
+        cudaMemcpyAsync(&d_arr2[offset], &arr2[offset], n  * sizeof(double) / nStreams, cudaMemcpyHostToDevice, stream[i]);
+        cudaMemcpyAsync(&d_arr3[offset], &arr3[offset], n * sizeof(double) / nStreams, cudaMemcpyHostToDevice, stream[i]);
+    }
+    cudaMemcpy(d_arr1, arr1, n * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_arr2, arr2, n * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_arr3, arr3, n * sizeof(int), cudaMemcpyHostToDevice);
+
+    cudaDeviceSynchronize();
+    cudaHostUnregister(arr1);
+    cudaHostUnregister(arr2);
+    cudaHostUnregister(arr3);
+    addKernel << <1, n >> > (d_arr3, d_arr1, d_arr2);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(arr1, d_arr1, n * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(arr2, d_arr2, n * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(arr3, d_arr3, n * sizeof(int), cudaMemcpyDeviceToHost);
+
+    for (int i = 0; i < n; i++) {
+        cout << arr1[i] << " + " << arr2[i] << " = " << arr3[i] << endl;
+    }*/
+
+   /* const int n = 1000;
+    unsigned short* arr1 = new unsigned short[n];
+    unsigned short* d_arr1;
+    auto f = cudaMalloc(&d_arr1, n * sizeof(unsigned short));
+    if (f != cudaSuccess) {
+        std::cout << "cudaMalloc failed (arr1)" << std::endl;
+    }
+
+    unsigned short* arr2 = new unsigned short[n];
+    unsigned short* d_arr2;
+    f = cudaMalloc(&d_arr2, n * sizeof(unsigned short));
+    if (f != cudaSuccess) {
+        std::cout << "cudaMalloc failed (arr2)" << std::endl;
+    }
+
+    int* test = new int[n];
+    int* d_test;
+    f = cudaMalloc(&d_test, n * sizeof(int));
+    if (f != cudaSuccess) {
+        std::cout << "cudaMalloc failed (arr2)" << std::endl;
+    }
+
+    for (int i = 0; i < n; i++) {
+        arr1[i] = 0;
+        arr2[i] = 0;
+        test[i] = i % 100;
+    }
+
+    int blockSize = 2 * 32;
+    int numBlocks = (n + blockSize - 1) / blockSize;
+
+    cudaMemcpy(d_test, test, n * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_arr1, arr1, n * sizeof(unsigned short), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_arr2, arr2, n * sizeof(unsigned short), cudaMemcpyHostToDevice);
+
+    setTestt << <numBlocks, blockSize >> > (d_test, d_arr1, d_arr2);
+    cudaDeviceSynchronize();
+    cudaMemcpy(test, d_test, n * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(arr1, d_arr1, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
+    cudaMemcpy(arr2, d_arr2, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
+
+    for (int i = 0; i < n; i++) {
+        std::cout << "i: " << i << " -> " << test[i] << std::endl;
+    }*/
+
+    
    cublasHandle_t cublas_handle;
     cublasStatus_t stat;
     stat = cublasCreate(&cublas_handle);
-    /*cout << "hallo2" << endl;
-    cout << "hallo" << endl;
-    cout << "sizeof double: " << sizeof(double) << endl;
-    cout << "sizeof short: " << sizeof(short) << endl;
-    cout << "sizeof int: " << sizeof(int) << endl;*/
+
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
     //cout << "cudaenginecount: " << prop.asyncEngineCount << endl;
@@ -109,9 +223,9 @@ int main()
     ElkanKmeans* alg = new ElkanKmeans();
     //FB1_ElkanKmeans* alg = new FB1_ElkanKmeans();
     //MO_ElkanKmeans* alg = new MO_ElkanKmeans();
-
+    std::cout << "Alg: " << alg->getName() << std::endl;
     //Dataset* x = load_dataset("C:\\Users\\Admin\\Desktop\\MASTER\\skin_nonskin.txt");
-    Dataset* x = load_randDataset(1000,10);
+    Dataset* x = load_randDataset(499200,10);
     if (x == nullptr) {
         cout << "Dataset generated" << endl;
         return 0;
@@ -122,16 +236,14 @@ int main()
     unsigned short* assignment = new unsigned short[x->n];
     unsigned short* d_assignment;
 
-    auto d = cudaMalloc(&d_assignment, x->n * sizeof(unsigned short));
-    if (d != cudaSuccess) {
-        std::cout << "cudaMalloc failed (assignment)" << std::endl;
-    }
+    //std::cout << "d_assignment malloc n: " << x->n << std::endl;
+   
     assign(*x, *initialCenters, assignment);
     alg->initialize(x, k, assignment, 1);
 
     auto start = std::chrono::system_clock::now();
     std::cout << "alg run start" << std::endl;
-    alg->run(50000);
+    alg->run(5000);
     std::cout << "alg run end" << std::endl;
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
@@ -141,7 +253,7 @@ int main()
     //x.fill(3.0);
     //x.print();
     cudaDeviceSynchronize();
-    cudaFree(d_assignment);
+    //cudaFree(d_assignment);
     delete assignment;
     delete alg;
     delete x;

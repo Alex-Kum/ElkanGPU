@@ -34,10 +34,15 @@ protected:
     // Keep track of the distance (divided by 2) between each pair of
     // points.
     double* centerCenterDistDiv2;
+    double* d_centerCenterDistDiv2;
     double* oldcenter2newcenterDis;
+    double* d_oldcenter2newcenterDis;
     double* oldcenters;
+    double* d_oldcenters;
     double* ub_old;
+    double* d_ub_old;
     double* oldcenterCenterDistDiv2;
+    double* d_oldcenterCenterDistDiv2;
     int move_centers2(int* sortindex, bool sorting, bool* nochanged);
     int move_centers_newbound(double* oldcenters, double* oldcenter2newcenterDis);
 

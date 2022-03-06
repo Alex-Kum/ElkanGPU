@@ -79,7 +79,7 @@ void TriangleInequalityBaseKmeans::initialize(Dataset const* aX, unsigned short 
         std::cout << "cudaMalloc failed (s)" << std::endl;
     }
     upper = new double[n];
-   auto k = cudaMalloc(&d_upper, n * sizeof(double));
+    auto k = cudaMalloc(&d_upper, n * sizeof(double));
     if (k != cudaSuccess) {
         std::cout << "cudaMalloc failed (upper)" << std::endl;
     }

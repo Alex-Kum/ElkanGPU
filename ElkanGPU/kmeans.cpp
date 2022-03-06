@@ -60,6 +60,10 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
 #endif
 
     assignment = initialAssignment;
+    auto r = cudaMalloc(&d_assignment, n * sizeof(unsigned short));
+    if (r != cudaSuccess) {
+        std::cout << "cudaMalloc failed (centerMovement)" << std::endl;
+    }
     centerMovement = new double[k];
     auto a = cudaMalloc(&d_centerMovement, k * sizeof(double));
     if (a != cudaSuccess) {
@@ -72,7 +76,7 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
     }
     for (int t = 0; t < numThreads; ++t) {
         clusterSize[t] = new int[k];
-        
+
         std::fill(clusterSize[t], clusterSize[t] + k, 0);
         for (int i = start(t); i < end(t); ++i) {
             assert(assignment[i] < k);
@@ -89,9 +93,9 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
 void Kmeans::changeAssignment(int xIndex, int closestCluster, int threadId) {
     --clusterSize[threadId][assignment[xIndex]];
     ++clusterSize[threadId][closestCluster];
-   
+
     assignment[xIndex] = closestCluster;
-    
+
 }
 #ifdef USE_THREADS
 struct ThreadInfo {

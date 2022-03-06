@@ -33,7 +33,7 @@ public:
     // keep the sumDataSquared
     Dataset(int aN, int aD, bool keepSDS = false) : n(aN), d(aD), nd(n* d), data(new double[nd]),
         sumDataSquared(keepSDS ? new double[n] : NULL) {
-        auto i = cudaMalloc(&d_data, nd * sizeof(double));     
+        auto i = cudaMalloc(&d_data, nd * sizeof(double));
         if (i != cudaSuccess) {
             std::cout << "cudaMalloc failed (data)" << std::endl;
         }
