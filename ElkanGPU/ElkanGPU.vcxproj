@@ -56,6 +56,7 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <AdditionalOptions>-lineinfo %(AdditionalOptions)</AdditionalOptions>
+      <CodeGeneration>compute_52,sm_52</CodeGeneration>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -76,6 +77,7 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <AdditionalOptions>-lineinfo %(AdditionalOptions)</AdditionalOptions>
+      <CodeGeneration>compute_52,sm_52</CodeGeneration>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -83,6 +85,7 @@
     <CudaCompile Include="FB1_elkan_kmeans.cu" />
     <CudaCompile Include="kernel.cu" />
     <CudaCompile Include="MO_elkan_kmeans.cu" />
+    <CudaCompile Include="yy_kmean.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Dataset.h" />
@@ -94,6 +97,9 @@
     <ClInclude Include="MO_elkan_kmeans.h" />
     <ClInclude Include="original_space_kmeans.h" />
     <ClInclude Include="triangle_inequality_base_kmeans.h" />
+    <ClInclude Include="yyheader.h" />
+    <ClInclude Include="yy_kmean.h" />
+    <ClInclude Include="yy_kmeans.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dataset.cpp" />
@@ -101,6 +107,7 @@
     <ClCompile Include="kmeans.cpp" />
     <ClCompile Include="original_space_kmeans.cpp" />
     <ClCompile Include="triangle_inequality_base_kmeans.cpp" />
+    <ClCompile Include="yy_kmeans.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

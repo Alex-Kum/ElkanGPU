@@ -23,7 +23,7 @@ __global__ void multip(const int* a, const int* b, int* c) {
     }
 }*/
 
-__device__ void addV(double* x,  double* y, int dim) {
+__device__ void addV(double* x, double* y, int dim) {
     double const* end = x + dim;
     while (x < end) {
         *(x++) += *(y++);
@@ -85,13 +85,13 @@ __global__ void innerProd(double* centerCenterDist, double* s, const double* dat
     //test[index] = 5;
 
     if (c1 != c2 && index < n * n) {
-       /* double dis1, dis2, dis3;
-        dis1 = dist(data, c1, c1, dim);
-        dis2 = 2 * dist(data, c1, c2, dim);
-        dis3 = dist(data, c2, c2, dim);*/
+        /* double dis1, dis2, dis3;
+         dis1 = dist(data, c1, c1, dim);
+         dis2 = 2 * dist(data, c1, c2, dim);
+         dis3 = dist(data, c2, c2, dim);*/
 
-        //printf("c1: %i----c2: %i\n", c1, c2);
-       // printf("1: %i, 2: %i, 3: %i\n",dis1, dis2, dis3 );
+         //printf("c1: %i----c2: %i\n", c1, c2);
+        // printf("1: %i, 2: %i, 3: %i\n",dis1, dis2, dis3 );
         double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
         //double distance = 2.0;
         centerCenterDist[index] = sqrt(distance) / 2.0;
@@ -189,7 +189,7 @@ __global__ void changeAss(double* data, unsigned short* assignment, unsigned sho
             unsigned short oldAssignment = assignment[i];
             --clusterSize[0][assignment[i]];
             ++clusterSize[0][closest2[i]];
-            
+
             assignment[i] = closest2[i];
             double* xp = data + i * dim;
             subVectorss(sumNewCenters + oldAssignment * dim, xp, dim);
@@ -198,7 +198,7 @@ __global__ void changeAss(double* data, unsigned short* assignment, unsigned sho
     }
 }
 
-__global__ void elkanFun(double* data, double* center, unsigned short* assignment, double* lower, double* upper, 
+__global__ void elkanFun(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
     double* s, double* centerCenterDistDiv2, int* clusterSize, double* sumNewCenters, double* centerMovement, int k, int dim, int n, int numlower, bool* converged, unsigned short* closest2) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -248,10 +248,10 @@ __global__ void elkanFun(double* data, double* center, unsigned short* assignmen
            //     printf("oldAssignment: %i, assignment: %i, cSize ass: %i, cSize clos: %i, xp %p\n", oldAssignment, closest2[i], clusterSize[0][assignment[i]], clusterSize[0][closest2[i]], xp);
            // }
             assignment[i] = closest2[i];
-            
+
             subVectorss(sumNewCenters + oldAssignment * dim, xp, dim);
             addVectorss(sumNewCenters + closest2[i] * dim, xp, dim);
-          
+
         }*/
 
 
@@ -294,14 +294,14 @@ __global__ void elkanFun(double* data, double* center, unsigned short* assignmen
 __global__ void wtfTest(bool* test) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     printf("test i = %i wird auf true gesetzt\n", i);
-    test[i] = true;   
+    test[i] = true;
 }
 
 __global__ void setTest(int* test, unsigned short* assignment, unsigned short* closest2) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < 1000) {
-       // unsigned short t = 2;
-        //closest2[i] = 2;
+        // unsigned short t = 2;
+         //closest2[i] = 2;
         closest2[i] = assignment[i];
         test[i] = 2;
     }
@@ -321,9 +321,9 @@ __global__ void elkanFunNoMove(double* data, double* center, unsigned short* ass
 
     int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
 
-   if (i < n) {
+    if (i < n) {
         //unsigned short closest = assignment[i];
-      
+
         closest2[i] = assignment[i];
         bool r = true;
 
@@ -453,7 +453,7 @@ __global__ void elkanFunFB(double* data, double* center, unsigned short* assignm
                     lower[i * k + closest2[i]] = upper[i];
                     r = false;
                     if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest2[i] * k + j]) || upper[i] <= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i]) {
-                    //if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest2[i] * k + j])) {
+                        //if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest2[i] * k + j])) {
                         continue;
                     }
                 }
@@ -527,7 +527,7 @@ test[i] = true;
                 if (j == closest) { continue; }
                 if (upper[i] <= lower[i * k + j]) { continue; }
                 if (upper[i] <= centerCenterDistDiv2[closest * k + j]) { continue; }
-                
+
                 // ELKAN 3(a)
                 if (r) {
                     //upper[i] = sqrt(pointCenterDist2(i, closest));
