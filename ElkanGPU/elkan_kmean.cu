@@ -7,7 +7,7 @@
  // -lineinfo  cuda c++ comand line
 
 #include "elkan_kmean.h"
-#include "gpufunctions.h"
+//#include "gpufunctions.h"
 #include "general_functions.h"
 #include <cmath>
 #include <chrono>
@@ -23,8 +23,8 @@
 #define GPUC 1
 #else
 #define GPUA 0
-#define GPUB 1
-#define GPUC 1
+#define GPUB 0
+#define GPUC 0
 #endif
 
 #define GPUD 0
