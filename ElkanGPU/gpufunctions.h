@@ -802,10 +802,32 @@ __device__ void addVectorss(double* a, double const* b, int d) {
     }
 }
 
-__device__ void subVectorss(double* a, double const* b, int d) {
+//__device__ void subVectorss(double* a, double const* b, int d) {
+//    double const* end = a + d;
+//    while (a < end) {
+//        //*(a++) -= *(b++);
+//        double bVal = *(b++);
+//        atomicSub(a, bVal);
+//        a++;
+//    }
+//}
+
+__device__ void addVectorsAtomic(double* a, double const* b, int d) {
     double const* end = a + d;
     while (a < end) {
-        *(a++) -= *(b++);
+        //*(a++) += *(b++);
+        double bVal = *(b++);
+        atomicAdd(a, bVal);
+        a++;
+    }
+}
+
+__device__ void subVectorsAtomic(double* a, double const* b, int d) {
+    double const* end = a + d;
+    while (a < end) {
+        double bVal = *(b++);
+        atomicAdd(a, -bVal);
+        a++;
     }
 }
 
@@ -836,11 +858,10 @@ __device__ double distp2c(const double* data, const double* center, int x, int y
     *res = result;
 }*/
 
-__global__ void innerProd(double* centerCenterDist, double* s, const double* data, int dim, int n, int* test) {
+__global__ void innerProd(double* centerCenterDist, double* s, const double* data, int dim, int n) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int c1 = index / n;
     int c2 = index % n;
-    //test[index] = 5;
 
     if (c1 != c2 && index < n * n) {
         /* double dis1, dis2, dis3;
@@ -849,8 +870,8 @@ __global__ void innerProd(double* centerCenterDist, double* s, const double* dat
          dis3 = dist(data, c2, c2, dim);*/
 
          //printf("c1: %i----c2: %i\n", c1, c2);
-        // printf("1: %i, 2: %i, 3: %i\n",dis1, dis2, dis3 );
-        double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
+         //printf("1: %i, 2: %i, 3: %i\n",dis1, dis2, dis3 );
+         double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
         //double distance = 2.0;
         centerCenterDist[index] = sqrt(distance) / 2.0;
 
@@ -939,18 +960,35 @@ __global__ void elkanFunMO(double* data, double* center, unsigned short* assignm
     }
 }
 
+__global__ void changeAssFirst(double* data, unsigned short* assignment, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int dim, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+
+        if (assignment[i] != closest2[i]) {
+            //unsigned short oldAssignment = assignment[i];
+           // --clusterSize[assignment[i]];
+            ++clusterSize[closest2[i]];
+            //assignment[i] = closest2[i];
+            //atomicSub(&clusterSize[assignment[i]], 1);
+            //atomicAdd(&clusterSize[closest2[i]], 1);            
+        }
+    }
+}
+
 __global__ void changeAss(double* data, unsigned short* assignment, unsigned short* closest2, int** clusterSize, double* sumNewCenters, int dim, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
 
         if (assignment[i] != closest2[i]) {
             unsigned short oldAssignment = assignment[i];
-            --clusterSize[0][assignment[i]];
-            ++clusterSize[0][closest2[i]];
+            /*--clusterSize[0][assignment[i]];
+            ++clusterSize[0][closest2[i]];*/
+            atomicSub(&clusterSize[0][assignment[i]], 1);
+            atomicAdd(&clusterSize[0][closest2[i]], 1);
 
             assignment[i] = closest2[i];
             double* xp = data + i * dim;
-            subVectorss(sumNewCenters + oldAssignment * dim, xp, dim);
+            addVectorss(sumNewCenters + oldAssignment * dim, xp, dim);
             addVectorss(sumNewCenters + closest2[i] * dim, xp, dim);
         }
     }
@@ -1073,15 +1111,43 @@ __global__ void setTesttt(int* test, unsigned short* arr1, unsigned short* arr2)
     }
 }
 
+__global__ void elkanMoveCenter(double* centerMovement, int* clusterSize, double* center, double* sumNewCenters, bool* converged, int k, int dim, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+
+    centerMovement[i] = 0.0;
+    int totalClusterSize = 0;
+    totalClusterSize += clusterSize[i];
+
+    if (totalClusterSize > 0) {
+        for (int d = 0; d < dim; ++d) {
+            double z = 0.0;
+            //z += (*sumNewCenters[0])(j, d);
+            z += sumNewCenters[i * dim + d];
+            z /= totalClusterSize;
+            //centerMovement[j] += (z - (*centers)(j, d)) * (z - (*centers)(j, d));//calculate distance
+            centerMovement[i] += (z - center[i * dim + d]) * (z - center[i * dim + d]);
+            //(*centers)(j, dim) = z; //update new centers
+            center[i * dim + d] = z;
+        }
+    }
+    centerMovement[i] = sqrt(centerMovement[i]);
+
+    if (centerMovement[i] > 0)
+        *converged = false;
+
+    /*if (centerMovement[furthestMovingCenter] < centerMovement[i]) {
+        furthestMovingCenter = i;
+    }
+    */
+}
 
 __global__ void elkanFunNoMove(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, int k, int dim, int n, int numlower, unsigned short* closest2, int offset) {
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, int numlower, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int offset) {
 
     int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
 
     if (i < n) {
-        //unsigned short closest = assignment[i];
-
         closest2[i] = assignment[i];
         bool r = true;
 
@@ -1108,6 +1174,18 @@ __global__ void elkanFunNoMove(double* data, double* center, unsigned short* ass
                     upper[i] = lower[i * k + j];
                 }
             }
+        }
+
+        if (assignment[i] != closest2[i]) {
+            unsigned short oldAssignment = assignment[i];
+
+            atomicSub(&clusterSize[assignment[i]], 1);
+            atomicAdd(&clusterSize[closest2[i]], 1);
+            double* xp = data + i * dim;
+            assignment[i] = closest2[i];
+
+            subVectorsAtomic(sumNewCenters + oldAssignment * dim, xp, dim);
+            addVectorsAtomic(sumNewCenters + closest2[i] * dim, xp, dim);
         }
     }
 }

@@ -93,12 +93,12 @@ void OriginalSpaceKmeans::initialize(Dataset const* aX, unsigned short aK, unsig
 }
 
 void OriginalSpaceKmeans::changeAssignment(int xIndex, int closestCluster, int threadId) {
-    unsigned short oldAssignment = assignment[xIndex];
+   /* unsigned short oldAssignment = assignment[xIndex];
     Kmeans::changeAssignment(xIndex, closestCluster, threadId);
     double* xp = x->data + xIndex * d;;
 
     subVectors(sumNewCenters[threadId]->data + oldAssignment * d, xp, d);
-    addVectors(sumNewCenters[threadId]->data + closestCluster * d, xp, d);
+    addVectors(sumNewCenters[threadId]->data + closestCluster * d, xp, d);*/
 
 }
 

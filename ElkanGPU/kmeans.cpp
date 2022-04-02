@@ -91,8 +91,8 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
 }
 
 void Kmeans::changeAssignment(int xIndex, int closestCluster, int threadId) {
-    --clusterSize[threadId][assignment[xIndex]];
-    ++clusterSize[threadId][closestCluster];
+    //--clusterSize[threadId][assignment[xIndex]];
+    //++clusterSize[threadId][closestCluster];
 
     assignment[xIndex] = closestCluster;
 
