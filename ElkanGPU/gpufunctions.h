@@ -728,7 +728,7 @@ __global__ void calcCentData(PointInfo* pointInfo,
     if (pointInfo[tid].oldCentroid >= 0)
         atomicAdd(&oldCounts[pointInfo[tid].oldCentroid], 1);
     //    oldCounts[pointInfo[tid].oldCentroid] += 1;
-        
+
 
     //newCounts[pointInfo[tid].centroidIndex] += 1;
     atomicAdd(&newCounts[pointInfo[tid].centroidIndex], 1);
@@ -871,13 +871,13 @@ __global__ void innerProd(double* centerCenterDist, double* s, const double* dat
 
          //printf("c1: %i----c2: %i\n", c1, c2);
          //printf("1: %i, 2: %i, 3: %i\n",dis1, dis2, dis3 );
-         double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
+        double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
         //double distance = 2.0;
         centerCenterDist[index] = sqrt(distance) / 2.0;
 
-        if (centerCenterDist[index] < s[c1]) {
+        //if (centerCenterDist[index] < s[c1]) {
             s[c1] = centerCenterDist[index];
-        }
+        //}
     }
 }
 
@@ -1114,28 +1114,32 @@ __global__ void setTesttt(int* test, unsigned short* arr1, unsigned short* arr2)
 __global__ void elkanMoveCenter(double* centerMovement, int* clusterSize, double* center, double* sumNewCenters, bool* converged, int k, int dim, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-
-    centerMovement[i] = 0.0;
-    int totalClusterSize = 0;
-    totalClusterSize += clusterSize[i];
-
-    if (totalClusterSize > 0) {
-        for (int d = 0; d < dim; ++d) {
-            double z = 0.0;
-            //z += (*sumNewCenters[0])(j, d);
-            z += sumNewCenters[i * dim + d];
-            z /= totalClusterSize;
-            //centerMovement[j] += (z - (*centers)(j, d)) * (z - (*centers)(j, d));//calculate distance
-            centerMovement[i] += (z - center[i * dim + d]) * (z - center[i * dim + d]);
-            //(*centers)(j, dim) = z; //update new centers
-            center[i * dim + d] = z;
+    if (i < n) {
+        centerMovement[i] = 0.0;
+        int totalClusterSize = 0;
+        totalClusterSize += clusterSize[i];
+       /* if (i == 1)
+            printf("movement: %f :::: center: %f\n", centerMovement[i], center[10]);*/
+        if (totalClusterSize > 0) {
+            
+            for (int d = 0; d < dim; ++d) {
+                double z = 0.0;
+                //z += (*sumNewCenters[0])(j, d);
+                z += sumNewCenters[i * dim + d];
+                z /= totalClusterSize;
+                //centerMovement[j] += (z - (*centers)(j, d)) * (z - (*centers)(j, d));//calculate distance
+                centerMovement[i] += (z - center[i * dim + d]) * (z - center[i * dim + d]);
+                //(*centers)(j, dim) = z; //update new centers
+                center[i * dim + d] = z;
+                /*if (i == 1)
+                    printf("movement: %f :::: new center: %f\n", centerMovement[i], center[10]);*/
+            }
         }
+        centerMovement[i] = sqrt(centerMovement[i]);
+
+        if (centerMovement[i] > 0)
+            *converged = false;
     }
-    centerMovement[i] = sqrt(centerMovement[i]);
-
-    if (centerMovement[i] > 0)
-        *converged = false;
-
     /*if (centerMovement[furthestMovingCenter] < centerMovement[i]) {
         furthestMovingCenter = i;
     }
