@@ -858,26 +858,80 @@ __device__ double distp2c(const double* data, const double* center, int x, int y
     *res = result;
 }*/
 
+__global__ void assignPointsSuper(PointInfo* pointInfo,
+    CentInfo* centInfo,
+    DTYPE* pointData,
+    DTYPE* pointLwrs,
+    DTYPE* centData,
+    DTYPE* maxDrift,
+    const int numPnt,
+    const int numCent,
+    const int numGrp,
+    const int numDim)
+{
+    unsigned int tid = threadIdx.x + (blockIdx.x * BLOCKSIZE);
+    if (tid >= numPnt)
+        return;
+
+    // point calc variables
+    int centIndex;
+    DTYPE compDistance;
+
+    // set centroid's old centroid to be current assignment
+    pointInfo[tid].oldCentroid = pointInfo[tid].centroidIndex;
+
+    // update bounds
+    pointInfo[tid].uprBound += centInfo[pointInfo[tid].centroidIndex].drift;
+    pointLwrs[tid * numGrp] -= *maxDrift;
+
+    if (pointLwrs[tid * numGrp] < pointInfo[tid].uprBound)
+    {
+        // tighten upper bound
+        pointInfo[tid].uprBound =
+            calcDis(&pointData[tid * numDim],
+                &centData[pointInfo[tid].centroidIndex * numDim], numDim);
+
+
+        if (pointLwrs[(tid * numGrp)] < pointInfo[tid].uprBound)
+        {
+            // to get a new lower bound
+            pointLwrs[tid * numGrp] = INFINITY;
+
+            for (centIndex = 0; centIndex < numCent; centIndex++)
+            {
+                // do not calculate for the already assigned cluster
+                if (centIndex == pointInfo[tid].oldCentroid)
+                    continue;
+
+                compDistance = calcDis(&pointData[tid * numDim],
+                    &centData[centIndex * numDim],
+                    numDim);
+
+                if (compDistance < pointInfo[tid].uprBound)
+                {
+                    pointLwrs[tid * numGrp] = pointInfo[tid].uprBound;
+                    pointInfo[tid].centroidIndex = centIndex;
+                    pointInfo[tid].uprBound = compDistance;
+                }
+                else if (compDistance < pointLwrs[tid * numGrp])
+                {
+                    pointLwrs[tid * numGrp] = compDistance;
+                }
+            }
+        }
+    }
+}
+
+
 __global__ void innerProd(double* centerCenterDist, double* s, const double* data, int dim, int n) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int c1 = index / n;
     int c2 = index % n;
 
     if (c1 != c2 && index < n * n) {
-        /* double dis1, dis2, dis3;
-         dis1 = dist(data, c1, c1, dim);
-         dis2 = 2 * dist(data, c1, c2, dim);
-         dis3 = dist(data, c2, c2, dim);*/
-
-         //printf("c1: %i----c2: %i\n", c1, c2);
-         //printf("1: %i, 2: %i, 3: %i\n",dis1, dis2, dis3 );
         double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
-        //double distance = 2.0;
         centerCenterDist[index] = sqrt(distance) / 2.0;
-
-        //if (centerCenterDist[index] < s[c1]) {
-            s[c1] = centerCenterDist[index];
-        //}
+        s[c1] = centerCenterDist[index];
     }
 }
 
@@ -895,9 +949,12 @@ __device__ double innerProdp2c(double* data, double* center, int x, int y, int d
 //    }
 //}
 
-__global__ void updateBound(double* lower, double* upper, double* centerMovement, unsigned short* assignment, int numLowerBounds, int k, int n) {
+__global__ void updateBound(double* data, double* lower, double* upper, double* centerMovement, unsigned short* assignment, int numLowerBounds, int dim, int k, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
+        
+        /*double dist = distp2c(data, lastExactCentroid, i, i, dim);                     
+        upper[i] = dist;*/
         upper[i] += centerMovement[assignment[i]];
         for (int j = 0; j < k; ++j) {
             lower[i * numLowerBounds + j] -= centerMovement[j];
@@ -975,21 +1032,20 @@ __global__ void changeAssFirst(double* data, unsigned short* assignment, unsigne
     }
 }
 
-__global__ void changeAss(double* data, unsigned short* assignment, unsigned short* closest2, int** clusterSize, double* sumNewCenters, int dim, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void changeAss(double* data, unsigned short* assignment, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int dim, int n, int offset) {
+    int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
 
         if (assignment[i] != closest2[i]) {
             unsigned short oldAssignment = assignment[i];
-            /*--clusterSize[0][assignment[i]];
-            ++clusterSize[0][closest2[i]];*/
-            atomicSub(&clusterSize[0][assignment[i]], 1);
-            atomicAdd(&clusterSize[0][closest2[i]], 1);
 
-            assignment[i] = closest2[i];
+            atomicSub(&clusterSize[assignment[i]], 1);
+            atomicAdd(&clusterSize[closest2[i]], 1);
             double* xp = data + i * dim;
-            addVectorss(sumNewCenters + oldAssignment * dim, xp, dim);
-            addVectorss(sumNewCenters + closest2[i] * dim, xp, dim);
+            assignment[i] = closest2[i];
+
+            subVectorsAtomic(sumNewCenters + oldAssignment * dim, xp, dim);
+            addVectorsAtomic(sumNewCenters + closest2[i] * dim, xp, dim);
         }
     }
 }
@@ -1116,23 +1172,15 @@ __global__ void elkanMoveCenter(double* centerMovement, int* clusterSize, double
 
     if (i < n) {
         centerMovement[i] = 0.0;
-        int totalClusterSize = 0;
-        totalClusterSize += clusterSize[i];
-       /* if (i == 1)
-            printf("movement: %f :::: center: %f\n", centerMovement[i], center[10]);*/
-        if (totalClusterSize > 0) {
-            
+        int totalClusterSize = clusterSize[i];
+
+        if (totalClusterSize > 0) {            
             for (int d = 0; d < dim; ++d) {
                 double z = 0.0;
-                //z += (*sumNewCenters[0])(j, d);
                 z += sumNewCenters[i * dim + d];
                 z /= totalClusterSize;
-                //centerMovement[j] += (z - (*centers)(j, d)) * (z - (*centers)(j, d));//calculate distance
                 centerMovement[i] += (z - center[i * dim + d]) * (z - center[i * dim + d]);
-                //(*centers)(j, dim) = z; //update new centers
                 center[i * dim + d] = z;
-                /*if (i == 1)
-                    printf("movement: %f :::: new center: %f\n", centerMovement[i], center[10]);*/
             }
         }
         centerMovement[i] = sqrt(centerMovement[i]);
@@ -1140,14 +1188,11 @@ __global__ void elkanMoveCenter(double* centerMovement, int* clusterSize, double
         if (centerMovement[i] > 0)
             *converged = false;
     }
-    /*if (centerMovement[furthestMovingCenter] < centerMovement[i]) {
-        furthestMovingCenter = i;
-    }
-    */
 }
 
+
 __global__ void elkanFunNoMove(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, int k, int dim, int n, int numlower, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int offset) {
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int offset) {
 
     int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1164,11 +1209,14 @@ __global__ void elkanFunNoMove(double* data, double* center, unsigned short* ass
                 // ELKAN 3(a)
                 if (r) {
                     upper[i] = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+                    /* for (int j = 0; j < dim; j++) {
+                         lastExactCentroid[i * dim + j] = center[assignment[i] * dim + j];
+                     }*/
                     lower[i * k + closest2[i]] = upper[i];
                     r = false;
-                    if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest2[i] * k + j])) {
-                        continue;
-                    }
+                     if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest2[i] * k + j])) {
+                         continue;
+                     }
                 }
 
                 // ELKAN 3(b)
@@ -1176,20 +1224,62 @@ __global__ void elkanFunNoMove(double* data, double* center, unsigned short* ass
                 if (lower[i * k + j] < upper[i]) {
                     closest2[i] = j;
                     upper[i] = lower[i * k + j];
+                    /*   for (int j = 0; j < dim; j++) {
+                           lastExactCentroid[i * dim + j] = center[assignment[i] * dim + j];
+                       }*/
                 }
             }
         }
+    }
+}
 
-        if (assignment[i] != closest2[i]) {
-            unsigned short oldAssignment = assignment[i];
+__global__ void elkanFunNoMoveNoFor(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int offset) {
 
-            atomicSub(&clusterSize[assignment[i]], 1);
-            atomicAdd(&clusterSize[closest2[i]], 1);
-            double* xp = data + i * dim;
-            assignment[i] = closest2[i];
+    int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
+    int c1 = i / k;
+    int j = i % k;
 
-            subVectorsAtomic(sumNewCenters + oldAssignment * dim, xp, dim);
-            addVectorsAtomic(sumNewCenters + closest2[i] * dim, xp, dim);
+    if (c1 < n) {
+        closest2[c1] = assignment[c1];
+
+        if (upper[c1] > s[closest2[c1]]) {
+            if (j == closest2[c1]) { return; }
+            if (upper[c1] <= lower[c1 * k + j]) { return; }
+
+            upper[c1] = sqrt(innerProdp2c(data, center, c1, closest2[c1], dim));
+            lower[c1 * k + j] = sqrt(innerProdp2c(data, center, c1, j, dim));
+
+            if (lower[c1 * k + j] < upper[c1]) {
+                closest2[c1] = j;
+                upper[c1] = lower[c1 * k + j];
+            }
+            
+        }
+    }
+}
+
+__global__ void elkanFunNoMoveFewer(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int offset) {
+
+    int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        //closest2[i] = assignment[i];
+
+        if (upper[i] > s[closest2[i]]) {
+            for (int j = 0; j < k; ++j) {
+                if (j == closest2[i]) { continue; }
+                if (upper[i] <= lower[i * k + j]) { continue; }
+               
+                upper[i] = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+                lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
+
+                if (lower[i * k + j] < upper[i]) {
+                    closest2[i] = j;
+                    upper[i] = lower[i * k + j];
+                }
+            }
         }
     }
 }
@@ -1356,46 +1446,3 @@ __global__ void elkanFunFB(double* data, double* center, unsigned short* assignm
 
     }
 }
-
-/*
-test[i] = true;
-        unsigned short closest = assignment[i];
-        bool r = true;
-
-        if (upper[i] > s[closest]) {
-            for (int j = 0; j < k; ++j) {
-                if (j == closest) { continue; }
-                if (upper[i] <= lower[i * k + j]) { continue; }
-                if (upper[i] <= centerCenterDistDiv2[closest * k + j]) { continue; }
-
-                // ELKAN 3(a)
-                if (r) {
-                    //upper[i] = sqrt(pointCenterDist2(i, closest));
-                    upper[i] = sqrt(innerProdp2c(data, center, i, closest, dim));
-                    lower[i * k + closest] = upper[i];
-                    r = false;
-                    if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest * k + j])) {
-                        continue;
-                    }
-                }
-
-                // ELKAN 3(b)
-                //lower[i * k + j] = sqrt(pointCenterDist2(i, j));
-                lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
-                if (lower[i * k + j] < upper[i]) {
-                    closest = j;
-                    upper[i] = lower[i * k + j];
-                }
-            }
-        }
-        if (assignment[i] != closest) {
-            unsigned short oldAssignment = assignment[i];
-            --clusterSize[0][assignment[i]];
-            ++clusterSize[0][closest];
-            assignment[i] = closest;
-            double* xp = data + i * dim;
-
-            subV(sumNewCenters + oldAssignment * dim, xp, dim);
-            addV(sumNewCenters + closest * dim, xp, dim);
-        }
-        */

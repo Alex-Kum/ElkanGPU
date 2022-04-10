@@ -1,6 +1,9 @@
 #pragma once
 #define DTYPE double
 #define BLOCKSIZE 256
+#define _HUGE_ENUF  1e+300
+#define INFINITY   ((float)(_HUGE_ENUF * _HUGE_ENUF))
+
 //const int BLOCKSIZE = 256;
 
 typedef struct PointInfo

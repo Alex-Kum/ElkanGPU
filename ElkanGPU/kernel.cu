@@ -164,6 +164,8 @@ int main(){
     //delete data2;
     //delete data3;
     //warumGehtNichts();
+
+
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
 
@@ -188,8 +190,9 @@ int main(){
 
     auto start = std::chrono::system_clock::now();
     std::cout << "alg run start" << std::endl;
-    alg->run(5000);
+    int iterations = alg->run(5000);
     std::cout << "alg run end" << std::endl;
+    std::cout << "Iterations: " << iterations << std::endl;
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     std::cout << "Sekunden: " << elapsed_seconds.count() << "\n";
@@ -271,10 +274,19 @@ int main(){
    ///* runtime =
    //     startLloydOnCPU(pointInfo, centInfo, pointData, centData,
    //         numPnt, numCent, numDim, 1, maxIter, &ranIter);*/
-   // runtime =
+   ///* runtime =
    //     startSimpleOnGPU(pointInfo, centInfo, pointData, centData,
    //         numPnt, numCent, numGrp, numDim, maxIter, numGPU,
-   //         &ranIter);
+   //         &ranIter);*/
+
+   ///* runtime =
+   //     startSuperOnGPU(pointInfo, centInfo, pointData, centData,
+   //         numPnt, numCent, numDim, maxIter, numGPU, &ranIter);*/
+   // runtime =
+   //     startSimpleOnCPU(pointInfo, centInfo, pointData, centData, numPnt,
+   //         numCent, numGrp, numDim, numThread, maxIter, &ranIter);
+
+
    // auto end = std::chrono::system_clock::now();
    // std::cout << "alg run end" << std::endl;
    // std::chrono::duration<double> elapsed_seconds = end - start;

@@ -9,6 +9,8 @@
 #include <cassert>
 #include <cmath>
 
+#define VERIFY_ASSIGNMENTS
+
 Kmeans::Kmeans() : x(NULL), n(0), k(0), d(0), numThreads(0), converged(false), counter(0),
 clusterSize(NULL), centerMovement(NULL), assignment(NULL) {
     //std::cout << "kmeans konstructor" << std::endl;
@@ -91,8 +93,8 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
 }
 
 void Kmeans::changeAssignment(int xIndex, int closestCluster, int threadId) {
-    //--clusterSize[threadId][assignment[xIndex]];
-    //++clusterSize[threadId][closestCluster];
+    --clusterSize[threadId][assignment[xIndex]];
+    ++clusterSize[threadId][closestCluster];
 
     assignment[xIndex] = closestCluster;
 
@@ -177,7 +179,7 @@ void Kmeans::verifyAssignment(int iteration, int startNdx, int endNdx) const {
 
         // if we have found a discrepancy, then print out information and crash
         // the program
-        if (closest != assignment[i]) {
+       /* if (closest != assignment[i]) {
             std::cerr << "assignment error:" << std::endl;
             std::cerr << "iteration             = " << iteration << std::endl;
             std::cerr << "point index           = " << i << std::endl;
@@ -186,7 +188,7 @@ void Kmeans::verifyAssignment(int iteration, int startNdx, int endNdx) const {
             std::cerr << "assigned center       = " << assignment[i] << std::endl;
             std::cerr << "assigned center dist2 = " << original_closest_dist2 << std::endl;
             assert(false);
-        }
+        }*/
     }
 #endif
 }

@@ -1,5 +1,5 @@
 //#include "yy_kmean.h"
-////#include "gpufunctions.h"
+//#include "gpufunctions.h"
 //#include "omp.h"
 //
 //
@@ -1553,6 +1553,799 @@
 //    free(newCentInfo);
 //    free(newCentData);
 //    free(oldCentData);
+//
+//    return 0.0;
+//}
+//
+//double startSuperOnGPU(PointInfo* pointInfo,
+//    CentInfo* centInfo,
+//    DTYPE* pointData,
+//    DTYPE* centData,
+//    const int numPnt,
+//    const int numCent,
+//    const int numDim,
+//    const int maxIter,
+//    const int numGPUU,
+//    unsigned int* ranIter)
+//{
+//
+//    // variable initialization
+//    int gpuIter;
+//    const int numGPU = 1;
+//    int numPnts[numGPU];
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        if (numPnt % numGPU != 0 && gpuIter == numGPU - 1)
+//        {
+//            numPnts[gpuIter] = (numPnt / numGPU) + (numPnt % numGPU);
+//        }
+//
+//        else
+//        {
+//            numPnts[gpuIter] = numPnt / numGPU;
+//        }
+//    }
+//
+//    unsigned int hostConFlagArr[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        hostConFlagArr[gpuIter] = 1;
+//    }
+//
+//    unsigned int* hostConFlagPtrArr[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        hostConFlagPtrArr[gpuIter] = &hostConFlagArr[gpuIter];
+//    }
+//
+//    int index = 1;
+//
+//    unsigned int NBLOCKS = ceil(numPnt * 1.0 / BLOCKSIZE * 1.0);
+//
+//    // group centroids
+//    for (int j = 0; j < numCent; j++)
+//    {
+//        centInfo[j].groupNum = 0;
+//    }
+//
+//    // create lower bound data on host
+//    DTYPE* pointLwrs = (DTYPE*)malloc(sizeof(DTYPE) * numPnt);
+//    for (int i = 0; i < numPnt; i++)
+//    {
+//        pointLwrs[i] = INFINITY;
+//    }
+//
+//    // store dataset on device
+//    PointInfo* devPointInfo[numGPU];
+//    DTYPE* devPointData[numGPU];
+//    DTYPE* devPointLwrs[numGPU];
+//
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        cudaSetDevice(gpuIter);
+//
+//        // alloc dataset to GPU
+//        gpuErrchk(cudaMalloc(&devPointInfo[gpuIter], sizeof(PointInfo) * (numPnts[gpuIter])));
+//
+//        // copy input data to GPU
+//        gpuErrchk(cudaMemcpy(devPointInfo[gpuIter],
+//            pointInfo + (gpuIter * numPnt / numGPU),
+//            (numPnts[gpuIter]) * sizeof(PointInfo),
+//            cudaMemcpyHostToDevice));
+//
+//        gpuErrchk(cudaMalloc(&devPointData[gpuIter], sizeof(DTYPE) * numPnts[gpuIter] * numDim));
+//
+//        gpuErrchk(cudaMemcpy(devPointData[gpuIter],
+//            pointData + ((gpuIter * numPnt / numGPU) * numDim),
+//            sizeof(DTYPE) * numPnts[gpuIter] * numDim,
+//            cudaMemcpyHostToDevice));
+//
+//        gpuErrchk(cudaMalloc(&devPointLwrs[gpuIter], sizeof(DTYPE) * numPnts[gpuIter]));
+//
+//        gpuErrchk(cudaMemcpy(devPointLwrs[gpuIter],
+//            pointLwrs + ((gpuIter * numPnt / numGPU)),
+//            sizeof(DTYPE) * numPnts[gpuIter],
+//            cudaMemcpyHostToDevice));
+//    }
+//
+//    // store centroids on device
+//    CentInfo* devCentInfo[numGPU];
+//    DTYPE* devCentData[numGPU];
+//
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//
+//        // alloc dataset and drift array to GPU
+//        gpuErrchk(cudaMalloc(&devCentInfo[gpuIter], sizeof(CentInfo) * numCent));
+//
+//        // copy input data to GPU
+//        gpuErrchk(cudaMemcpy(devCentInfo[gpuIter],
+//            centInfo, sizeof(CentInfo) * numCent,
+//            cudaMemcpyHostToDevice));
+//
+//        gpuErrchk(cudaMalloc(&devCentData[gpuIter], sizeof(DTYPE) * numCent * numDim));
+//        gpuErrchk(cudaMemcpy(devCentData[gpuIter],
+//            centData, sizeof(DTYPE) * numCent * numDim,
+//            cudaMemcpyHostToDevice));
+//    }
+//
+//    DTYPE* devMaxDrift[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        cudaMalloc(&devMaxDrift[gpuIter], sizeof(DTYPE));
+//    }
+//
+//    // centroid calculation data
+//    DTYPE* devNewCentSum[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        cudaMalloc(&devNewCentSum[gpuIter], sizeof(DTYPE) * numCent * numDim);
+//    }
+//
+//    DTYPE* devOldCentSum[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        cudaMalloc(&devOldCentSum[gpuIter], sizeof(DTYPE) * numCent * numDim);
+//    }
+//
+//    DTYPE* devOldCentData[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        cudaMalloc(&devOldCentData[gpuIter], sizeof(DTYPE) * numCent * numDim);
+//    }
+//
+//    unsigned int* devNewCentCount[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        cudaMalloc(&devNewCentCount[gpuIter], sizeof(unsigned int) * numCent);
+//    }
+//
+//    unsigned int* devOldCentCount[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        cudaMalloc(&devOldCentCount[gpuIter], sizeof(unsigned int) * numCent);
+//    }
+//
+//    unsigned int* devConFlagArr[numGPU];
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        cudaMalloc(&devConFlagArr[gpuIter], sizeof(unsigned int));
+//        gpuErrchk(cudaMemcpy(devConFlagArr[gpuIter],
+//            hostConFlagPtrArr[gpuIter], sizeof(unsigned int),
+//            cudaMemcpyHostToDevice));
+//    }
+//
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        clearCentCalcData << <NBLOCKS, BLOCKSIZE >> > (devNewCentSum[gpuIter],
+//            devOldCentSum[gpuIter],
+//            devNewCentCount[gpuIter],
+//            devOldCentCount[gpuIter],
+//            numCent,
+//            numDim);
+//
+//    }
+//
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        clearDriftArr << <NBLOCKS, BLOCKSIZE >> > (devMaxDrift[gpuIter], 1);
+//    }
+//
+//    // do single run of naive kmeans for initial centroid assignments
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        initRunKernel << <NBLOCKS, BLOCKSIZE >> > (devPointInfo[gpuIter],
+//            devCentInfo[gpuIter],
+//            devPointData[gpuIter],
+//            devPointLwrs[gpuIter],
+//            devCentData[gpuIter],
+//            numPnts[gpuIter],
+//            numCent,
+//            1,
+//            numDim);
+//    }
+//
+//
+//    CentInfo** allCentInfo = (CentInfo**)malloc(sizeof(CentInfo*) * numGPU);
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        allCentInfo[gpuIter] = (CentInfo*)malloc(sizeof(CentInfo) * numCent);
+//    }
+//
+//    DTYPE** allCentData = (DTYPE**)malloc(sizeof(DTYPE*) * numGPU);
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        allCentData[gpuIter] = (DTYPE*)malloc(sizeof(DTYPE) * numCent * numDim);
+//    }
+//
+//    CentInfo* newCentInfo = (CentInfo*)malloc(sizeof(CentInfo) * numCent);
+//
+//    DTYPE* newCentData = (DTYPE*)malloc(sizeof(DTYPE) * numCent * numDim);
+//    for (int i = 0; i < numCent; i++)
+//    {
+//        for (int j = 0; j < numDim; j++)
+//        {
+//            newCentData[(i * numDim) + j] = 0;
+//        }
+//    }
+//
+//    DTYPE* oldCentData = (DTYPE*)malloc(sizeof(DTYPE) * numCent * numDim);
+//
+//    DTYPE* newMaxDriftArr;
+//    newMaxDriftArr = (DTYPE*)malloc(sizeof(DTYPE) * 1);
+//    for (int i = 0; i < 1; i++)
+//    {
+//        newMaxDriftArr[i] = 0.0;
+//    }   
+//
+//    unsigned int doesNotConverge = 1;
+//
+//    // loop until convergence
+//    while (doesNotConverge && index < maxIter)
+//    {
+//        doesNotConverge = 0;
+//
+//        for (int i = 0; i < numCent; i++)
+//        {
+//            newCentInfo[i].count = 0;
+//        }
+//
+//#pragma omp parallel for num_threads(numGPU)
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            hostConFlagArr[gpuIter] = 0;
+//        }
+//
+//#pragma omp parallel for num_threads(numGPU)
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            gpuErrchk(cudaSetDevice(gpuIter));
+//            gpuErrchk(cudaMemcpy(devConFlagArr[gpuIter],
+//                hostConFlagPtrArr[gpuIter], sizeof(unsigned int),
+//                cudaMemcpyHostToDevice));
+//        }
+//
+//        // clear maintained data on device
+//#pragma omp parallel for num_threads(numGPU)
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            gpuErrchk(cudaSetDevice(gpuIter));
+//            clearDriftArr << <NBLOCKS, BLOCKSIZE >> > (devMaxDrift[gpuIter], 1);
+//
+//        }
+//
+//        // calculate data necessary to make new centroids
+//#pragma omp parallel for num_threads(numGPU)
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            gpuErrchk(cudaSetDevice(gpuIter));
+//            calcCentData << <NBLOCKS, BLOCKSIZE >> > (devPointInfo[gpuIter], devCentInfo[gpuIter],
+//                devPointData[gpuIter], devOldCentSum[gpuIter],
+//                devNewCentSum[gpuIter], devOldCentCount[gpuIter],
+//                devNewCentCount[gpuIter], numPnts[gpuIter], numDim);
+//
+//        }
+//
+//        // make new centroids
+//#pragma omp parallel for num_threads(numGPU)
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            gpuErrchk(cudaSetDevice(gpuIter));
+//            calcNewCentroids << <NBLOCKS, BLOCKSIZE >> > (devPointInfo[gpuIter], devCentInfo[gpuIter],
+//                devCentData[gpuIter], devOldCentData[gpuIter],
+//                devOldCentSum[gpuIter], devNewCentSum[gpuIter],
+//                devMaxDrift[gpuIter],
+//                devOldCentCount[gpuIter],
+//                devNewCentCount[gpuIter],
+//                numCent, numDim);
+//
+//        }
+//
+//       
+//
+//#pragma omp parallel for num_threads(numGPU)
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            gpuErrchk(cudaSetDevice(gpuIter));
+//            assignPointsSuper << <NBLOCKS, BLOCKSIZE >> > (devPointInfo[gpuIter],
+//                devCentInfo[gpuIter],
+//                devPointData[gpuIter],
+//                devPointLwrs[gpuIter],
+//                devCentData[gpuIter],
+//                devMaxDrift[gpuIter],
+//                numPnts[gpuIter], numCent,
+//                1, numDim);
+//
+//        }
+//
+//#pragma omp parallel for num_threads(numGPU)
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            gpuErrchk(cudaSetDevice(gpuIter));
+//            checkConverge << <NBLOCKS, BLOCKSIZE >> > (devPointInfo[gpuIter],
+//                devConFlagArr[gpuIter],
+//                numPnts[gpuIter]);
+//
+//        }
+//
+//        index++;
+//
+//#pragma omp parallel for num_threads(numGPU)
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            gpuErrchk(cudaSetDevice(gpuIter));
+//            gpuErrchk(cudaMemcpy(hostConFlagPtrArr[gpuIter],
+//                devConFlagArr[gpuIter], sizeof(unsigned int),
+//                cudaMemcpyDeviceToHost));
+//        }
+//
+//        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//        {
+//            if (hostConFlagArr[gpuIter])
+//            {
+//                doesNotConverge = 1;
+//            }
+//        }
+//    }
+//
+//    // calculate data necessary to make new centroids
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        calcCentData << <NBLOCKS, BLOCKSIZE >> > (devPointInfo[gpuIter], devCentInfo[gpuIter],
+//            devPointData[gpuIter], devOldCentSum[gpuIter],
+//            devNewCentSum[gpuIter], devOldCentCount[gpuIter],
+//            devNewCentCount[gpuIter], numPnts[gpuIter], numDim);
+//    }
+//
+//    // make new centroids
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//        calcNewCentroids << <NBLOCKS, BLOCKSIZE >> > (devPointInfo[gpuIter], devCentInfo[gpuIter],
+//            devCentData[gpuIter], devOldCentData[gpuIter],
+//            devOldCentSum[gpuIter], devNewCentSum[gpuIter],
+//            devMaxDrift[gpuIter], devOldCentCount[gpuIter],
+//            devNewCentCount[gpuIter], numCent, numDim);
+//    }   
+//
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        cudaSetDevice(gpuIter);
+//        cudaDeviceSynchronize();
+//    }
+//
+//#pragma omp parallel for num_threads(numGPU)
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        gpuErrchk(cudaSetDevice(gpuIter));
+//
+//        // copy finished clusters and points from device to host
+//        gpuErrchk(cudaMemcpy(pointInfo + ((gpuIter * numPnt / numGPU)),
+//            devPointInfo[gpuIter], sizeof(PointInfo) * numPnts[gpuIter], cudaMemcpyDeviceToHost));
+//    }
+//
+//    // and the final centroid positions
+//    gpuErrchk(cudaMemcpy(centData, devCentData[0],
+//        sizeof(DTYPE) * numCent * numDim, cudaMemcpyDeviceToHost));
+//
+//    *ranIter = index;
+//
+//    // clean up, return
+//    for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
+//    {
+//        cudaFree(devPointInfo[gpuIter]);
+//        cudaFree(devPointData[gpuIter]);
+//        cudaFree(devPointLwrs[gpuIter]);
+//        cudaFree(devCentInfo[gpuIter]);
+//        cudaFree(devCentData[gpuIter]);
+//        cudaFree(devMaxDrift[gpuIter]);
+//        cudaFree(devNewCentSum[gpuIter]);
+//        cudaFree(devOldCentSum[gpuIter]);
+//        cudaFree(devNewCentCount[gpuIter]);
+//        cudaFree(devOldCentCount[gpuIter]);
+//        cudaFree(devConFlagArr[gpuIter]);
+//    }
+//
+//    free(allCentInfo);
+//    free(allCentData);
+//    free(newCentInfo);
+//    free(newCentData);
+//    free(oldCentData);
+//    free(pointLwrs);
+//
+//    return 0.0;
+//}
+//
+//void initPoints(PointInfo* pointInfo,
+//    CentInfo* centInfo,
+//    DTYPE* pointData,
+//    DTYPE* pointLwrs,
+//    DTYPE* centData,
+//    const int numPnt,
+//    const int numCent,
+//    const int numGrp,
+//    const int numDim,
+//    const int numThread)
+//{
+//    unsigned int pntIndex, centIndex;
+//
+//    DTYPE currDistance;
+//
+//    // start single standard k-means iteration for initial bounds and cluster assignments
+//      // assignment
+//#pragma omp parallel \
+//  private(pntIndex, centIndex, currDistance) \
+//  shared(pointInfo, centInfo, pointData, pointLwrs, centData)
+//    {
+//#pragma omp for schedule(static)
+//        for (pntIndex = 0; pntIndex < numPnt; pntIndex++)
+//        {
+//            pointInfo[pntIndex].uprBound = INFINITY;
+//
+//            // for all centroids
+//            for (centIndex = 0; centIndex < numCent; centIndex++)
+//            {
+//                // currDistance is equal to the distance between the current feature
+//                // vector being inspected, and the current centroid being compared
+//                currDistance = calcDisCPU(&pointData[pntIndex * numDim],
+//                    &centData[centIndex * numDim],
+//                    numDim);
+//
+//                // if the the currDistance is less than the current minimum distance
+//                if (currDistance < pointInfo[pntIndex].uprBound)
+//                {
+//                    if (pointInfo[pntIndex].uprBound != INFINITY)
+//                        pointLwrs[(pntIndex * numGrp) +
+//                        centInfo[pointInfo[pntIndex].centroidIndex].groupNum] =
+//                        pointInfo[pntIndex].uprBound;
+//                    // update assignment and upper bound
+//                    pointInfo[pntIndex].centroidIndex = centIndex;
+//                    pointInfo[pntIndex].uprBound = currDistance;
+//                }
+//                else if (currDistance < pointLwrs[(pntIndex * numGrp) + centInfo[centIndex].groupNum])
+//                {
+//                    pointLwrs[(pntIndex * numGrp) + centInfo[centIndex].groupNum] = currDistance;
+//                }
+//            }
+//        }
+//    }
+//}
+//
+//void updateCentroids(PointInfo* pointInfo,
+//    CentInfo* centInfo,
+//    DTYPE* pointData,
+//    DTYPE* centData,
+//    DTYPE* maxDriftArr,
+//    const int numPnt,
+//    const int numCent,
+//    const int numGrp,
+//    const int numDim,
+//    const int numThread)
+//{
+//    unsigned int pntIndex, centIndex, grpIndex, dimIndex;
+//
+//    DTYPE compDrift;
+//
+//    // holds the number of points assigned to each centroid formerly and currently
+//    unsigned int* oldCounts = (unsigned int*)malloc(sizeof(unsigned int) * numCent);
+//    unsigned int* newCounts = (unsigned int*)malloc(sizeof(unsigned int) * numCent);
+//
+//    // holds the new vector calculated
+//    DTYPE* oldVecs = (DTYPE*)malloc(sizeof(DTYPE) * numCent * numDim);
+//    DTYPE oldCentFeat;
+//
+//
+//    omp_set_num_threads(numThread);
+//
+//    omp_lock_t driftLock;
+//    omp_init_lock(&driftLock);
+//
+//    // allocate data for new and old vector sums
+//    DTYPE* oldSums = (DTYPE*)malloc(sizeof(DTYPE) * numCent * numDim);
+//    DTYPE* newSums = (DTYPE*)malloc(sizeof(DTYPE) * numCent * numDim);
+//    DTYPE oldSumFeat;
+//    DTYPE newSumFeat;
+//
+//    for (centIndex = 0; centIndex < numCent; centIndex++)
+//    {
+//        for (dimIndex = 0; dimIndex < numDim; dimIndex++)
+//        {
+//            oldSums[(centIndex * numDim) + dimIndex] = 0.0;
+//            newSums[(centIndex * numDim) + dimIndex] = 0.0;
+//        }
+//        oldCounts[centIndex] = 0;
+//        newCounts[centIndex] = 0;
+//    }
+//    for (grpIndex = 0; grpIndex < numGrp; grpIndex++)
+//    {
+//        maxDriftArr[grpIndex] = 0.0;
+//    }
+//
+//    for (pntIndex = 0; pntIndex < numPnt; pntIndex++)
+//    {
+//        // add one to the old count and new count for each centroid
+//        if (pointInfo[pntIndex].oldCentroid >= 0)
+//            oldCounts[pointInfo[pntIndex].oldCentroid]++;
+//
+//        newCounts[pointInfo[pntIndex].centroidIndex]++;
+//
+//        // if the old centroid does not match the new centroid,
+//        // add the points vector to each 
+//        if (pointInfo[pntIndex].oldCentroid != pointInfo[pntIndex].centroidIndex)
+//        {
+//            for (dimIndex = 0; dimIndex < numDim; dimIndex++)
+//            {
+//                if (pointInfo[pntIndex].oldCentroid >= 0)
+//                {
+//                    oldSums[(pointInfo[pntIndex].oldCentroid * numDim) + dimIndex] +=
+//                        pointData[(pntIndex * numDim) + dimIndex];
+//                }
+//                newSums[(pointInfo[pntIndex].centroidIndex * numDim) + dimIndex] +=
+//                    pointData[(pntIndex * numDim) + dimIndex];
+//            }
+//        }
+//    }
+//
+//
+//
+//#pragma omp parallel \
+//  private(centIndex, dimIndex, oldCentFeat, oldSumFeat, newSumFeat, compDrift) \
+//  shared(driftLock, centInfo, centData, maxDriftArr, oldVecs)
+//    {
+//        // create new centroid points
+//#pragma omp for schedule(static)
+//        for (centIndex = 0; centIndex < numCent; centIndex++)
+//        {
+//            for (dimIndex = 0; dimIndex < numDim; dimIndex++)
+//            {
+//                if (newCounts[centIndex] > 0)
+//                {
+//                    oldVecs[(centIndex * numDim) + dimIndex] = centData[(centIndex * numDim) + dimIndex];
+//                    oldCentFeat = oldVecs[(centIndex * numDim) + dimIndex];
+//                    oldSumFeat = oldSums[(centIndex * numDim) + dimIndex];
+//                    newSumFeat = newSums[(centIndex * numDim) + dimIndex];
+//
+//                    centData[(centIndex * numDim) + dimIndex] =
+//                        (oldCentFeat * oldCounts[centIndex] - oldSumFeat + newSumFeat)
+//                        / newCounts[centIndex];
+//                    //printf("(%f * %d - %f + %f) / %d\n", oldCentFeat,oldCounts[centIndex],oldSumFeat,newSumFeat,newCounts[centIndex]);
+//
+//                }
+//                else
+//                {
+//                    // if the centroid has no current members, no change occurs to its position
+//                    oldVecs[(centIndex * numDim) + dimIndex] = centData[(centIndex * numDim) + dimIndex];
+//                }
+//            }
+//            compDrift = calcDisCPU(&oldVecs[centIndex * numDim],
+//                &centData[centIndex * numDim], numDim);
+//            omp_set_lock(&driftLock);
+//            // printf("%d\n",centInfo[centIndex].groupNum);
+//            if (compDrift > maxDriftArr[centInfo[centIndex].groupNum])
+//            {
+//                maxDriftArr[centInfo[centIndex].groupNum] = compDrift;
+//            }
+//            omp_unset_lock(&driftLock);
+//            centInfo[centIndex].drift = compDrift;
+//        }
+//    }
+//    omp_destroy_lock(&driftLock);
+//
+//    free(oldCounts);
+//    free(newCounts);
+//    free(oldVecs);
+//    free(oldSums);
+//    free(newSums);
+//
+//}
+//
+//void pointCalcsSimpleCPU(PointInfo* pointInfoPtr,
+//    CentInfo* centInfo,
+//    DTYPE* pointDataPtr,
+//    DTYPE* pointLwrPtr,
+//    DTYPE* centData,
+//    DTYPE* maxDriftArr,
+//    unsigned int* groupArr,
+//    const int numPnt,
+//    const int numCent,
+//    const int numGrp,
+//    const int numDim)
+//{
+//    // index variables
+//    unsigned int centIndex, grpIndex;
+//
+//    DTYPE compDistance;
+//
+//    for (grpIndex = 0; grpIndex < numGrp; grpIndex++)
+//    {
+//        // if the group is not blocked by group filter
+//        if (groupArr[grpIndex])
+//        {
+//            // reset the lwrBoundArr to be only new lwrBounds
+//            pointLwrPtr[grpIndex] = INFINITY;
+//        }
+//    }
+//
+//    for (centIndex = 0; centIndex < numCent; centIndex++)
+//    {
+//        // if the centroid's group is marked in groupArr
+//        if (groupArr[centInfo[centIndex].groupNum])
+//        {
+//            // if it was the originally assigned cluster, no need to calc dist
+//            if (centIndex == pointInfoPtr->oldCentroid)
+//                continue;
+//
+//            // compute distance between point and centroid
+//            compDistance = calcDisCPU(pointDataPtr, &centData[centIndex * numDim], numDim);
+//
+//            if (compDistance < pointInfoPtr->uprBound)
+//            {
+//                pointLwrPtr[centInfo[pointInfoPtr->centroidIndex].groupNum] = pointInfoPtr->uprBound;
+//                pointInfoPtr->centroidIndex = centIndex;
+//                pointInfoPtr->uprBound = compDistance;
+//            }
+//            else if (compDistance < pointLwrPtr[centInfo[centIndex].groupNum])
+//            {
+//                pointLwrPtr[centInfo[centIndex].groupNum] = compDistance;
+//            }
+//        }
+//    }
+//}
+//
+//double startSimpleOnCPU(PointInfo* pointInfo,
+//    CentInfo* centInfo,
+//    DTYPE* pointData,
+//    DTYPE* centData,
+//    const int numPnt,
+//    const int numCent,
+//    const int numGrp,
+//    const int numDim,
+//    const int numThread,
+//    const int maxIter,
+//    unsigned int* ranIter)
+//{
+//    // index variables
+//    unsigned int pntIndex, grpIndex;
+//    unsigned int index = 1;
+//    unsigned int conFlag = 0;
+//
+//    // array to contain the maximum drift of each group of centroids
+//    // note: shared amongst all points
+//    DTYPE* maxDriftArr = (DTYPE*)malloc(sizeof(DTYPE) * numGrp);
+//
+//    // array of all the points lower bounds
+//    DTYPE* pointLwrs = (DTYPE*)malloc(sizeof(DTYPE) * numPnt * numGrp);
+//
+//    // initiatilize to INFINITY
+//    for (grpIndex = 0; grpIndex < numPnt * numGrp; grpIndex++)
+//    {
+//        pointLwrs[grpIndex] = INFINITY;
+//    }
+//
+//    // array to contain integer flags which mark which groups need to be checked
+//    // for a potential new centroid
+//    // note: unique to each point
+//    unsigned int* groupLclArr = (unsigned int*)malloc(sizeof(unsigned int) * numPnt * numGrp);
+//
+//    omp_set_num_threads(numThread);
+//
+//    // the minimum of all the lower bounds for a single point
+//    DTYPE tmpGlobLwr = INFINITY;
+//
+//    // cluster the centroids into NGROUPCPU groups
+//    groupCent(centInfo, centData, numCent, numGrp, numDim);
+//
+//    // run one iteration of standard kmeans for initial centroid assignments
+//    initPoints(pointInfo, centInfo, pointData, pointLwrs,
+//        centData, numPnt, numCent, numGrp, numDim, numThread);
+//    // master loop
+//    while (!conFlag && index < maxIter)
+//    {
+//        // clear drift array each new iteration
+//        for (grpIndex = 0; grpIndex < numGrp; grpIndex++)
+//        {
+//            maxDriftArr[grpIndex] = 0.0;
+//        }
+//        // update centers via optimised update method
+//        updateCentroids(pointInfo, centInfo, pointData, centData,
+//            maxDriftArr, numPnt, numCent, numGrp, numDim, numThread);
+//        // filtering done in parallel
+//#pragma omp parallel \
+//    private(pntIndex, grpIndex, tmpGlobLwr) \
+//    shared(pointInfo, centInfo, pointData, centData, maxDriftArr, groupLclArr)
+//        {
+//#pragma omp for schedule(static)
+//            for (pntIndex = 0; pntIndex < numPnt; pntIndex++)
+//            {
+//                // reset old centroid before possibly finding a new one
+//                pointInfo[pntIndex].oldCentroid = pointInfo[pntIndex].centroidIndex;
+//
+//                tmpGlobLwr = INFINITY;
+//
+//                // update upper bound
+//                    // ub = ub + centroid's drift
+//                pointInfo[pntIndex].uprBound +=
+//                    centInfo[pointInfo[pntIndex].centroidIndex].drift;
+//
+//                // update group lower bounds
+//                    // lb = lb - maxGroupDrift
+//                for (grpIndex = 0; grpIndex < numGrp; grpIndex++)
+//                {
+//                    pointLwrs[(pntIndex * numGrp) + grpIndex] -= maxDriftArr[grpIndex];
+//
+//                    if (pointLwrs[(pntIndex * numGrp) + grpIndex] < tmpGlobLwr)
+//                    {
+//                        // minimum lower bound
+//                        tmpGlobLwr = pointLwrs[(pntIndex * numGrp) + grpIndex];
+//                    }
+//                }
+//
+//                // global filtering
+//                // if global lowerbound >= upper bound
+//                if (tmpGlobLwr < pointInfo[pntIndex].uprBound)
+//                {
+//                    // tighten upperbound ub = d(x, b(x))
+//                    pointInfo[pntIndex].uprBound =
+//                        calcDisCPU(&pointData[pntIndex * numDim],
+//                            &centData[pointInfo[pntIndex].centroidIndex * numDim],
+//                            numDim);
+//                    // check condition again
+//                    if (tmpGlobLwr < pointInfo[pntIndex].uprBound)
+//                    {
+//                        // group filtering
+//                        for (grpIndex = 0; grpIndex < numGrp; grpIndex++)
+//                        {
+//                            // mark groups that need to be checked
+//                            if (pointLwrs[(pntIndex * numGrp) + grpIndex] < pointInfo[pntIndex].uprBound)
+//                                groupLclArr[(pntIndex * numGrp) + grpIndex] = 1;
+//                            else
+//                                groupLclArr[(pntIndex * numGrp) + grpIndex] = 0;
+//                        }
+//
+//                        // pass group array and point to go execute distance calculations
+//                        pointCalcsSimpleCPU(&pointInfo[pntIndex], centInfo,
+//                            &pointData[pntIndex * numDim], &pointLwrs[pntIndex * numGrp],
+//                            centData, maxDriftArr, &groupLclArr[pntIndex * numGrp],
+//                            numPnt, numCent, numGrp, numDim);
+//                    }
+//                }
+//            }
+//        }
+//        index++;
+//        conFlag = checkConverge(pointInfo, numPnt);
+//    }
+//    updateCentroids(pointInfo, centInfo, pointData, centData,
+//        maxDriftArr, numPnt, numCent, numGrp, numDim, numThread);
+//
+//    *ranIter = index;
 //
 //    return 0.0;
 //}

@@ -10,6 +10,63 @@
 //    const int numCopy,
 //    const int numDim);
 //
+//double startSuperOnGPU(PointInfo* pointInfo,
+//    CentInfo* centInfo,
+//    DTYPE* pointData,
+//    DTYPE* centData,
+//    const int numPnt,
+//    const int numCent,
+//    const int numDim,
+//    const int maxIter,
+//    const int numGPUU,
+//    unsigned int* ranIter);
+//
+//void initPoints(PointInfo* pointInfo,
+//    CentInfo* centInfo,
+//    DTYPE* pointData,
+//    DTYPE* pointLwrs,
+//    DTYPE* centData,
+//    const int numPnt,
+//    const int numCent,
+//    const int numGrp,
+//    const int numDim,
+//    const int numThread);
+//
+//void updateCentroids(PointInfo* pointInfo,
+//    CentInfo* centInfo,
+//    DTYPE* pointData,
+//    DTYPE* centData,
+//    DTYPE* maxDriftArr,
+//    const int numPnt,
+//    const int numCent,
+//    const int numGrp,
+//    const int numDim,
+//    const int numThread);
+//
+//void pointCalcsSimpleCPU(PointInfo* pointInfoPtr,
+//    CentInfo* centInfo,
+//    DTYPE* pointDataPtr,
+//    DTYPE* pointLwrPtr,
+//    DTYPE* centData,
+//    DTYPE* maxDriftArr,
+//    unsigned int* groupArr,
+//    const int numPnt,
+//    const int numCent,
+//    const int numGrp,
+//    const int numDim);
+//
+//double startSimpleOnCPU(PointInfo* pointInfo,
+//    CentInfo* centInfo,
+//    DTYPE* pointData,
+//    DTYPE* centData,
+//    const int numPnt,
+//    const int numCent,
+//    const int numGrp,
+//    const int numDim,
+//    const int numThread,
+//    const int maxIter,
+//    unsigned int* ranIter);
+//
 //double startFullOnGPU(PointInfo* pointInfo,
 //    CentInfo* centInfo,
 //    DTYPE* pointData,
