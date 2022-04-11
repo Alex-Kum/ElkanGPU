@@ -1,0 +1,196 @@
+KMEANS lloyd GPU
+GPU: 25.8sek
+CPU: 49sek
+
+GPU EXECUTION
+matrix_multiplication:    22500ms
+calculate_centroids:      822ms
+all_dots:                 592ms
+make_new_labels:          281ms
+
+DATA MIGRATION
+Host to Device:   6.5ms
+Device to Host:   1.9ms
+Device to Device: 300.9ms
+
+
+
+KMEANS elkan (with stream)
+GPU: 2.66sek
+CPU: 12.5
+
+GPU EXECUTION
+elkanFun:      778.8ms
+updateBounds:  687.2ms
+
+
+DATA MIGRATION
+Host to Device:   106.0ms
+Device to Host:   96.6ms
+Device to Device: 4.3ms
+
+KMEANS elkan (with stream version2 10 streams)
+GPU: 2.64sek
+
+KMEANS elkan (with stream version2 2 streams)
+GPU: 2.1sek
+
+
+KMEANS elkan (with stream version2 1 stream)
+GPU: 2.2sek
+
+KMEANS elkan (with stream version2 5 streams)
+GPU: 2.2sek
+
+GPU EXECUTION
+elkanFun:      921.8ms
+updateBounds:  682.2ms
+
+
+DATA MIGRATION
+Host to Device:   114.0ms
+Device to Host:   96.8ms
+Device to Device: 5.4ms
+
+
+KMEANS elkan (without stream)
+GPU: 2.33sek
+
+GPU EXECUTION
+elkanFun:      700.0ms
+updateBounds:  686.3ms
+
+
+DATA MIGRATION
+Host to Device:   105.0ms
+Device to Host:   89.9ms
+
+-----------------------------------------------------------------------
+
+KMEANS elkan (only converged transmission)
+CPU: 12.5sek
+GPU: 1.37sek
+
+GPU EXECUTION
+elkanFunNoMove:  711.1ms
+updateBounds:    526.7ms
+changeAss:       17.7ms
+moveCenter:      5.0ms
+innerProd:       3.7ms
+
+DATA MIGRATION
+Host to Device:   11.7ms
+Device to Host:   223.1us
+
+
+KMEANS elkan (fewer rules)
+CPU: 12.5sek
+GPU: 1.18sek
+
+GPU EXECUTION
+elkanFunNoMove:  530.4ms
+updateBounds:    522.9ms
+changeAss:       16.5ms
+moveCenter:      4.9ms
+innerProd:       3.7ms
+
+DATA MIGRATION
+Host to Device:   12.2ms
+Device to Host:   225.4us
+
+
+KMEANS elkan (more accurate bounds)
+GPU: 2.81sek
+
+GPU EXECUTION
+elkanFunNoMove:  1883.6ms
+updateBounds:    720.1ms
+changeAss:       24.4ms
+moveCenter:      3.9ms
+innerProd:       3.3ms
+
+DATA MIGRATION
+Host to Device:   17.2ms
+Device to Host:   236.2us
+
+
+KMEANS YY (without profiler)
+GPU: 0.62sek
+
+KMEANS YY (profiler)
+CPU: 4.38sek
+GPU: 0.69sek
+
+GPU EXECUTION
+assignPointsSimple:  286.1ms
+calcCentData:  153.6ms
+checkConvergence:  17.6ms
+calcNewCentroids:  4.7ms
+initRunKernel:  4.3ms
+clearDriftArr:  3.4ms
+clearCentCalcData:  10.2us
+
+DATA MIGRATION
+Host to Device:   12.5ms
+Device to Host:   1.1ms
+
+mikail
+in loop:
+convergence flag: unsigned int 1
+
+KMEANS FBElkan (only converged transmission)
+CPU: 14.7sek
+GPU: 1.63sek
+
+GPU EXECUTION
+elkanFunNoMoveFB:    769.9ms
+updateBoundFB        701.8ms
+changeAss:           18.4ms
+moveCenterFB:        5.1ms
+innerProd:           3.7ms
+elkanFBMoveAddition: 2.8ms
+
+DATA MIGRATION
+Host to Device:   13.0ms
+Device to Host:   249.1us
+
+
+KMEANS FBElkan (fewer rules)
+GPU: 1.35sek
+
+GPU EXECUTION
+updateBoundFB        680.6ms
+elkanFunNoMoveFB:    544.0ms
+changeAss:           16.8ms
+moveCenterFB:        5.5ms
+innerProd:           3.7ms
+elkanFBMoveAddition: 2.8ms
+
+DATA MIGRATION
+Host to Device:   12.4ms
+Device to Host:   222.7us
+
+
+
+KMEANS MOElkan (only converged transmission)
+CPU: 87.2sek
+GPU: 2.94sek
+
+GPU EXECUTION
+elkanFunNoMoveMO:    2.8s
+updateBoundMO:       36.3ms
+changeAss:           15.4ms
+moveCenterFB:        6.1ms
+innerProd:           3.7ms
+elkanFBMoveAddition: 2.8ms
+
+DATA MIGRATION
+Host to Device:   7.8ms
+Device to Host:   308.2us
+
+
+
+
+
+
+r doesnt make difference
