@@ -281,6 +281,27 @@ void assign(Dataset const& x, Dataset const& c, unsigned short* assignment) {
     }
 }
 
+void assignLow(Dataset const& x, Dataset const& c, unsigned short* assignment, double* lower) {
+    for (int i = 0; i < x.n; ++i) {
+        double shortestDist2 = std::numeric_limits<double>::max();
+        double low = std::numeric_limits<double>::max();
+        int closest = 0;
+        for (int j = 0; j < c.n; ++j) {
+            double d2 = 0.0, * a = x.data + i * x.d, * b = c.data + j * x.d;
+            for (; a != x.data + (i + 1) * x.d; ++a, ++b) {
+                d2 += (*a - *b) * (*a - *b);
+            }
+            if (d2 < shortestDist2) {
+                low = shortestDist2;
+                shortestDist2 = d2;
+                closest = j;
+            }
+        }
+        assignment[i] = closest;
+        lower[i] = low;
+    }
+}
+
 timeP get_time() {
     /*rusage now;
     getrusage(RUSAGE_SELF, &now);

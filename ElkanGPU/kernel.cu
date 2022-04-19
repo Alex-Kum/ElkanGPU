@@ -11,6 +11,7 @@
 #include "general_functions.h"
 #include "kmeans.h"
 #include "elkan_kmean.h"
+#include "ham_elkan.h"
 
 //#include "yy_kmean.h"
 //#include "FB1_elkan_kmeans.h"
@@ -170,7 +171,9 @@ int main(){
     cudaGetDeviceProperties(&prop, 0);
 
     int k = 10;
-    ElkanKmeans* alg = new ElkanKmeans();
+    //* alg = new HamElkan();
+    HamElkan* alg = new HamElkan();
+    //ElkanKmeans* alg = new ElkanKmeans();
     //FB1_ElkanKmeans* alg = new FB1_ElkanKmeans();
     //MO_ElkanKmeans* alg = new MO_ElkanKmeans();
     std::cout << "Alg: " << alg->getName() << std::endl;
@@ -183,10 +186,14 @@ int main(){
     cout << "Dataset loaded" << endl;
     Dataset* initialCenters = init_centers(*x, k);
     unsigned short* assignment = new unsigned short[x->n];
-    unsigned short* d_assignment;
+    double* low = new double[x->n];
 
-    assign(*x, *initialCenters, assignment);
-    alg->initialize(x, k, assignment, 1);
+
+    //assign(*x, *initialCenters, assignment);
+    //alg->initialize(x, k, assignment, 1);
+
+    assignLow(*x, *initialCenters, assignment, low);
+    alg->initialize(x, k, assignment, low, 1);
 
     auto start = std::chrono::system_clock::now();
     std::cout << "alg run start" << std::endl;
@@ -200,6 +207,7 @@ int main(){
     cudaDeviceSynchronize();
 
     delete[] assignment;
+    delete[] low;
     delete alg;
     delete x;
     //cudaDeviceReset();
