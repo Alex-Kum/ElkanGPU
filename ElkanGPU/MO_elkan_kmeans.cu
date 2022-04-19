@@ -18,20 +18,23 @@
 #define GPUC 0
 
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
+{
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
+}
 
 void MO_ElkanKmeans::update_center_dists(int threadId) {
 #if GPUA
-    // find the inter-center distances
-    for (int c1 = 0; c1 < k; ++c1) {
-        s[c1] = std::numeric_limits<double>::max();
-    }
+    const int n = centers->n * centers->n;
+    const int blockSize = 3 * 32;
+    const int numBlocks = (n + blockSize - 1) / blockSize;
 
-    int n = *centers->n * *centers->n;
-    int blockSize = 3 * 32;
-    int numBlocks = (n + blockSize - 1) / blockSize;
-    innerProd << <numBlocks, blockSize >> > (centerCenterDistDiv2, s, centers->data, *centers->d, *centers->n);
-    //dist2 << <1, 10 >> > (data, 0, 1, 5, 0, res);
-    cudaDeviceSynchronize();
+    innerProd << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_s, centers->d_data, centers->d, centers->n);
 #else
     // find the inter-center distances
     for (int c1 = 0; c1 < k; ++c1) {
@@ -90,45 +93,51 @@ int MO_ElkanKmeans::runThread(int threadId, int maxIterations) {
     //oldcenters->fill(0.0);
     std::fill(oldcenters, oldcenters + k * d, 0.0);
 
+    bool* convergedd = new bool;
+    bool* d_converged;
+    f = cudaMalloc(&d_converged, 1 * sizeof(bool));
+    if (f != cudaSuccess) {
+        std::cout << "cudaMalloc failed (converged)" << std::endl;
+    }
+
 #if GPUC
+    const int nC = endNdx;
+    const int blockSizeC = 3 * 32;
+    const int numBlocksC = (n + blockSizeC - 1) / blockSizeC;
+
+    const int nM = centers->n;
+    const int blockSizeM = 1 * 32;
+    const int numBlocksM = (nM + blockSizeM - 1) / blockSizeM;
+
     cudaMemcpy(x->d_data, x->data, (n * d) * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_upper, upper, n * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_ub_old, ub_old, n * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_assignment, assignment, n * sizeof(unsigned short), cudaMemcpyHostToDevice);
-    
+    cudaMemcpy(centers->d_data, centers->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_oldcenter2newcenterDis, oldcenter2newcenterDis, (k * k) * sizeof(double), cudaMemcpyHostToDevice);
+    gpuErrchk(cudaMemcpy(sumNewCenters[0]->d_data, sumNewCenters[0]->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(d_clusterSize, clusterSize[0], k * sizeof(int), cudaMemcpyHostToDevice));
 #endif
 
-
+#if GPUC
+    while ((iterations < maxIterations) && !(*convergedd)) {
+#else
     while ((iterations < maxIterations) && !converged) {
+#endif 
         ++iterations;
-#if Countdistance
-        int numberdistances = 0;
-#endif
+        *convergedd = true;
+
         update_center_dists(threadId);
 #if GPUC
-        int n = endNdx;
-        int blockSize = 3 * 32;
-        int numBlocks = (n + blockSize - 1) / blockSize;
-        cudaMemcpy(centers->d_data, centers->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_s, s, k * sizeof(double), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_centerCenterDistDiv2, centerCenterDistDiv2, (k * k) * sizeof(double), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_oldcenter2newcenterDis, oldcenter2newcenterDis, (k * k) * sizeof(double), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_closest2, closest2, n * sizeof(unsigned short), cudaMemcpyHostToDevice);
-        //elkanFun << <numBlocks, blockSize >> > (x->data, centers->data, assignment, lower, upper, s, centerCenterDistDiv2, clusterSize, sumNewCenters[threadId]->data, centerMovement, k, d, endNdx);
-        elkanFunMO << <numBlocks, blockSize >> > (x->d_data, centers->d_data, d_assignment, d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_oldcenterCenterDistDiv2, d_ub_old, d_centerMovement, k, d, endNdx, d_closest2);
-        cudaDeviceSynchronize();
-        cudaMemcpy(centers->data, centers->d_data, (k * d) * sizeof(double), cudaMemcpyDeviceToHost);
-        cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
-        cudaMemcpy(s, d_s, k * sizeof(double), cudaMemcpyDeviceToHost);
-        cudaMemcpy(centerCenterDistDiv2, d_centerCenterDistDiv2, (k * k) * sizeof(double), cudaMemcpyDeviceToHost);
-        cudaMemcpy(oldcenter2newcenterDis, d_oldcenter2newcenterDis, (k * k) * sizeof(double), cudaMemcpyDeviceToHost);
-        cudaMemcpy(closest2, d_closest2, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
+        int nC = endNdx;
+        int blockSizeC = 3 * 32;
+        int numBlocksC = (nC + blockSizeC - 1) / blockSizeC;   
+        
+        elkanFunMO << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment, 
+            d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_oldcenterCenterDistDiv2, d_ub_old, d_centerMovement, k, d, endNdx, d_closest2);
 
-        for (int i = startNdx; i < endNdx; ++i) {
-            if (assignment[i] != closest2[i]) {
-                changeAssignment(i, closest2[i], threadId);
-            }
-        }
+        changeAss << <numBlocksC, blockSizeC >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nC, 0);
+
 #else
         for (int i = startNdx; i < endNdx; ++i) {
             unsigned short closest = assignment[i];
@@ -189,25 +198,37 @@ int MO_ElkanKmeans::runThread(int threadId, int maxIterations) {
         // ELKAN 4, 5, AND 6
         synchronizeAllThreads();
 #endif
+#if GPUC 
+        cudaMemcpy(d_converged, convergedd, 1 * sizeof(bool), cudaMemcpyHostToDevice);
+        elkanMoveCenterFB << <numBlocksM, blockSizeM >> > (d_centerMovement, d_clusterSize, centers->d_data, sumNewCenters[threadId]->d_data, d_oldcenters, d_converged, k, d, nM);
+        cudaMemcpy(convergedd, d_converged, 1 * sizeof(bool), cudaMemcpyDeviceToHost);
+
+        const int n = centers->n * centers->n;
+        const int blockSize = 1 * 32;
+        const int numBlocks = (n + blockSize - 1) / blockSize;
+        elkanFBMoveAddition << <numBlocks, blockSize >> > (d_oldcenters, d_oldcenter2newcenterDis, centers->d_data, d, k, centers->n);
+#else
         if (threadId == 0) {
             int furthestMovingCenter = move_centers_newbound(oldcenters, oldcenter2newcenterDis);
             converged = (0.0 == centerMovement[furthestMovingCenter]);
         }
-
-        //synchronizeAllThreads();
-        //total_elkan_time += (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start_time));
+#endif          
+#if GPUC
+        if (!(*convergedd)) {
+#else
         if (!converged) {
-            update_bounds(startNdx, endNdx);
-        }
-        else {
-            //std::cout << iterations << "\n";
-#if Time
-            std::cout << total_elkan_time.count() << "\n";
 #endif
+            update_bounds(startNdx, endNdx);
         }
         synchronizeAllThreads();
 
     }
+    cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
+    for (int i = 0; i < 20; i++) {
+        std::cout << "assignment: " << assignment[i] << std::endl;
+    }
+    delete convergedd;
+    cudaFree(d_converged);
     std::cout << "ITERATIONEN: " << iterations << std::endl;
     return iterations;
 }
@@ -217,18 +238,9 @@ void MO_ElkanKmeans::update_bounds(int startNdx, int endNdx) {
     int n = endNdx;
     int blockSize = 3 * 32;
     int numBlocks = (n + blockSize - 1) / blockSize;
-    cudaMemcpy(d_assignment, assignment, n * sizeof(unsigned short), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_centerMovement, centerMovement, k * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_upper, upper, n * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_ub_old, ub_old, n * sizeof(double), cudaMemcpyHostToDevice);
 
     updateBoundMO << <numBlocks, blockSize >> > (d_upper, d_ub_old, d_centerMovement, d_assignment, endNdx);
-    cudaDeviceSynchronize();
 
-    cudaMemcpy(upper, d_upper, n * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(ub_old, d_ub_old, n * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(centerMovement, d_centerMovement, k * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
 #else
     for (int i = startNdx; i < endNdx; ++i) {
         ub_old[i] = upper[i];
@@ -255,6 +267,7 @@ void MO_ElkanKmeans::free() {
     cudaFree(d_oldcenterCenterDistDiv2);
     cudaFree(d_oldcenter2newcenterDis);
     cudaFree(d_oldcenters);
+    
     delete centerCenterDistDiv2;
     centerCenterDistDiv2 = NULL;
     cudaFree(d_ub_old);

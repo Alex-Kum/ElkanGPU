@@ -52,9 +52,9 @@ int OriginalSpaceKmeans::move_centers() {
             }
         }
         centerMovement[j] = sqrt(centerMovement[j]);
-        if (j == 1) {
+        /*if (j == 1) {
             std::cout << "center: " << (*centers)(1, 0) << std::endl;
-        }
+        }*/
        // std::cout << "center 3: " << centerMovement[furthestMovingCenter] <<  std::endl;
         if (centerMovement[furthestMovingCenter] < centerMovement[j]) {
             furthestMovingCenter = j;

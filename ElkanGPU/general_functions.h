@@ -90,6 +90,7 @@ std::chrono::duration<double> elapsed_time(timeP start);
 void centerDataset(Dataset* x);
 
 void assign(Dataset const& x, Dataset const& c, unsigned short* assignment);
+void assignLow(Dataset const& x, Dataset const& c, unsigned short* assignment, double* low);
 
 
 #endif
