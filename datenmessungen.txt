@@ -190,6 +190,34 @@ Device to Host:   308.2us
 
 
 
+---------------------------------------------------------------------------
+KMEANS Elkan/Ham(global lower bound/Hamerly?)
+GPU: 0.88s
+
+GPU EXECUTION
+elkanFunHam:         718.8ms
+updateBoundHam:      76.2ms
+changeAss:           17.8ms
+moveCenter:          4.7ms
+innerProd:           3.8ms
+
+DATA MIGRATION
+Host to Device:   7.1ms
+Device to Host:   223.4us
+
+
+KMEANS Elkan/Ham(global lower bound/Hamerly?) (fewer rules)
+GPU: 0.88ms
+
+GPU EXECUTION
+elkanFunHam:         706.9ms
+updateBoundHam:      75.9ms
+changeAss:           17.3ms
+moveCenter:          5.2ms
+
+DATA MIGRATION
+Host to Device:   6.6ms
+Device to Host:   228.64us
 
 
 
