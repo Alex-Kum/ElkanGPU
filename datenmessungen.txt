@@ -256,4 +256,4 @@ Host to Device:   7.8ms
 Device to Host:   307.2us
 
 
-//LLOYD 2.24
+//LLOYD 2.24sec
