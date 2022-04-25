@@ -221,4 +221,39 @@ Device to Host:   228.64us
 
 
 
-r doesnt make difference
+KMEANS MOElkanHam
+GPU: 2.32sek
+
+GPU EXECUTION
+elkanFunNoMoveMO:    2.16s
+updateBoundMO:       36.3ms
+changeAss:           16.6ms
+moveCenterFB:        6.8ms
+innerProd:           3.8ms
+elkanFBMoveAddition: 2.8ms
+elkanMoveCenterMax:  2.2ms
+elkanFBMoveMoveAdditionHam:  2.02ms
+
+DATA MIGRATION
+Host to Device:   6.9ms
+Device to Host:   297.6us
+
+
+KMEANS FBElkanHam
+GPU: 0.9sek
+
+GPU EXECUTION
+updateBoundFB        699.0ms
+elkanFunNoMoveFB:    72.8ms
+changeAss:           17.2ms
+moveCenterFB:        5.4ms
+innerProd:           3.8ms
+elkanFBMoveAddition: 2.9ms
+elkanFBMoveAdditionHam: 1.6ms
+
+DATA MIGRATION
+Host to Device:   7.8ms
+Device to Host:   307.2us
+
+
+//LLOYD 2.24
