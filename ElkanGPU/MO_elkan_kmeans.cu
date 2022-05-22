@@ -6,16 +6,16 @@
 
 #include "MO_elkan_kmeans.h"
 #include "general_functions.h"
-//#include "gpufunctions.h"
+#include "gpufunctions.h"
 #include <cmath>
 #include <chrono>
  //using namespace std::chrono;
 
 #define Time 0
 #define Countdistance 0
-#define GPUA 0
-#define GPUB 0
-#define GPUC 0
+#define GPUA 1
+#define GPUB 1
+#define GPUC 1
 
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -34,7 +34,8 @@ void MO_ElkanKmeans::update_center_dists(int threadId) {
     const int blockSize = 3 * 32;
     const int numBlocks = (n + blockSize - 1) / blockSize;
 
-    innerProd << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_s, centers->d_data, centers->d, centers->n);
+    cudaMemset(d_s, std::numeric_limits<double>::max(), k * sizeof(double));
+    innerProdMO << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_oldcenterCenterDistDiv2, d_s, centers->d_data, centers->d, k, centers->n);
 #else
     // find the inter-center distances
     for (int c1 = 0; c1 < k; ++c1) {
@@ -199,6 +200,16 @@ int MO_ElkanKmeans::runThread(int threadId, int maxIterations) {
         synchronizeAllThreads();
 #endif
 #if GPUC 
+        /*cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
+        cudaMemcpy(centers->data, centers->d_data, (k * d) * sizeof(double), cudaMemcpyDeviceToHost);
+        cudaMemcpy(x->data, x->d_data, (n * d) * sizeof(double), cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
+        verifyAssignment(iterations, startNdx, endNdx);
+        cudaMemcpy(d_assignment, assignment, n * sizeof(unsigned short), cudaMemcpyHostToDevice);
+        cudaMemcpy(centers->d_data, centers->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice);
+        cudaMemcpy(x->d_data, x->data, (n * d) * sizeof(double), cudaMemcpyHostToDevice);
+        cudaDeviceSynchronize();*/
+
         cudaMemcpy(d_converged, convergedd, 1 * sizeof(bool), cudaMemcpyHostToDevice);
         elkanMoveCenterFB << <numBlocksM, blockSizeM >> > (d_centerMovement, d_clusterSize, centers->d_data, sumNewCenters[threadId]->d_data, d_oldcenters, d_converged, k, d, nM);
         cudaMemcpy(convergedd, d_converged, 1 * sizeof(bool), cudaMemcpyDeviceToHost);

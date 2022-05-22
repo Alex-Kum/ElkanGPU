@@ -12,10 +12,12 @@
 #include "kmeans.h"
 #include "elkan_kmean.h"
 #include "ham_elkan.h"
+#include "ham_elkanFB.h"
+#include "ham_elkanMO.h"
 
-//#include "yy_kmean.h"
-//#include "FB1_elkan_kmeans.h"
-//#include "MO_elkan_kmeans.h"
+#include "yy_kmean.h"
+#include "FB1_elkan_kmeans.h"
+#include "MO_elkan_kmeans.h"
 
 #include <fstream>
 #include <stdio.h>
@@ -46,50 +48,70 @@ __global__ void setTestt(int* test, unsigned short* arr1, unsigned short* arr2) 
     }
 }
 
-Dataset* load_dataset(std::string const& filename) {
-    std::ifstream input(filename.c_str());
+Dataset* loadDataset(std::string const& filename, int n, int d) {
+    std::string number;
+    Dataset* x = nullptr;
+    fstream file;
 
-    int n, d;
-    input >> n >> d;
-
-    Dataset* x = new Dataset(n, d);
-
-    double* dataTMP = new double[n * d];
-
-
-    //double* copyP1 = x->data;
-    for (int i = 0; i < n * d; ++i) {
-        input >> x->data[i];
-        //copyP1++;
-    }
+    file.open(filename, ios::in);
+    x = new Dataset(n, d);
+    int i = 0;
+    while (getline(file, number, ','))
+    {
+        x->data[i] = atof(number.c_str());       
+        i++;
+        if (i >= n * d)
+            break;
+    }   
+    file.close();
     return x;
+
+
+
+    //std::ifstream input(filename.c_str());
+
+    //int n, d;
+    //input >> n >> d;
+
+    //Dataset* x = new Dataset(n, d);
+
+    //double* dataTMP = new double[n * d];
+
+
+    ////double* copyP1 = x->data;
+    //for (int i = 0; i < n * d; ++i) {
+    //    input >> x->data[i];
+    //    //copyP1++;
+    //}
+    //return x;
 }
 
-//int importPoints(
-//    PointInfo* pointInfo,
-//    DTYPE* pointData,
-//    const int numPnt,
-//    const int numDim)
-//{
-//    std::string number;
-//    fstream file;
-//    file.open("file.txt", ios::in);
-//    int i = 0;
-//    while (getline(file, number, ','))
-//    {
-//        pointData[i] = atof(number.c_str());
-//        i++;
-//        if (i == 4992000)
-//            break;
-//    }
-//
-//    for (int j = 0; j < numPnt; j++) {
-//        pointInfo[j].centroidIndex = -1;
-//        pointInfo[j].oldCentroid = -1;
-//        pointInfo[j].uprBound = INFINITY;
-//    }
-//    return 0;
-//}
+int importPoints(
+    PointInfo* pointInfo,
+    DTYPE* pointData,
+    const int numPnt,
+    const int numDim)
+{
+    std::string number;
+    fstream file;
+    //file.open("file.txt", ios::in);
+    //file.open("gassensor_clean.data", ios::in);
+    //file.open("KEGGNetwork_clean.data", ios::in);    
+    file.open("USCensus_clean.data", ios::in);
+    int i = 0;
+    while (getline(file, number, ','))
+    {
+        pointData[i] = atof(number.c_str());
+        i++;
+    }
+
+    for (int j = 0; j < numPnt; j++) {
+        pointInfo[j].centroidIndex = -1;
+        pointInfo[j].oldCentroid = -1;
+        pointInfo[j].uprBound = INFINITY;
+    }
+    return 0;
+}
 
 Dataset* load_randDataset(int n, int d) {
     bool createNew = false;
@@ -167,18 +189,23 @@ int main(){
     //warumGehtNichts();
 
 
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, 0);
+   // cudaDeviceProp prop;
+   // cudaGetDeviceProperties(&prop, 0);
 
-    int k = 10;
-    //* alg = new HamElkan();
-    HamElkan* alg = new HamElkan();
+    int k = 4;
+   // * alg = new HamElkan();
+    //HamElkan* alg = new HamElkan();
     //ElkanKmeans* alg = new ElkanKmeans();
     //FB1_ElkanKmeans* alg = new FB1_ElkanKmeans();
     //MO_ElkanKmeans* alg = new MO_ElkanKmeans();
+    //HamElkanFB* alg = new HamElkanFB();
+    HamElkanMO* alg = new HamElkanMO();
     std::cout << "Alg: " << alg->getName() << std::endl;
     //Dataset* x = load_dataset("C:\\Users\\Admin\\Desktop\\MASTER\\skin_nonskin.txt");
-    Dataset* x = load_randDataset(499200, 10);
+    //Dataset* x = loadDataset("file.txt", 499200, 100);    
+    //Dataset* x = loadDataset("KEGGNetwork_clean.data", 65554, 28);
+    Dataset* x = loadDataset("USCensus_clean.data", 2458285, 68);
+    //Dataset* x = loadDataset("gassensor_clean.data", 13910, 128);
     if (x == nullptr) {
         cout << "Dataset generated" << endl;
         return 0;
@@ -189,11 +216,11 @@ int main(){
     double* low = new double[x->n];
 
 
-    //assign(*x, *initialCenters, assignment);
-    //alg->initialize(x, k, assignment, 1);
+    assign(*x, *initialCenters, assignment);
+    alg->initialize(x, k, assignment, 1);
 
-    assignLow(*x, *initialCenters, assignment, low);
-    alg->initialize(x, k, assignment, low, 1);
+    /*assignLow(*x, *initialCenters, assignment, low);
+    alg->initialize(x, k, assignment, low, 1);*/
 
     auto start = std::chrono::system_clock::now();
     std::cout << "alg run start" << std::endl;
@@ -210,13 +237,25 @@ int main(){
     delete[] low;
     delete alg;
     delete x;
-    //cudaDeviceReset();
+    cudaDeviceReset();
 
      //!____________________________________________________________________________________________________________________________________________________
-   // const int numPnt = 499200;
-   // const int numCent = 10;
-   // const int numGrp = 5;
-   // const int numDim = 10;
+    ///*const int numPnt = 499200;
+    //const int numCent = 10;
+    //const int numDim = 100;*/
+    //const int numPnt = 13910;    
+    //const int numCent = 100;
+    //const int numDim = 128;
+    ///*const int numPnt = 65554;
+    //const int numCent = 100;
+    //const int numDim = 28;*/
+    ///*const int numPnt = 2458285;
+    //const int numCent = 100;
+    //const int numDim = 68;*/
+    //const int numGrp = 10;
+
+
+    
    // const  int numThread = 1;
    // const int maxIter = 5000;
    // const  int numGPU = 1;
@@ -251,7 +290,7 @@ int main(){
    // DTYPE* centData = (DTYPE*)malloc(sizeof(DTYPE) * numCent * numDim);
 
    // // generate centroid data using dataset points
-   // if (generateCentWithData(centInfo, centData, pointData, numCent, numPnt, numDim))
+    //if (generateCentWithDataSame(centInfo, centData, pointData, numCent, numPnt, numDim))
    // {
    //     // signal erroneous exit
    //     printf("\nERROR: Could not generate centroids. Exiting program.\n");
@@ -269,10 +308,10 @@ int main(){
    // std::cout << "numDim: " << numDim << std::endl;
    // std::cout << "maxIter: " << maxIter << std::endl;
    // std::cout << "numGPU: " << numGPU << std::endl;
-   // std::cout << "pInfo: " << pointInfo[40000].centroidIndex << std::endl;
+   // /*std::cout << "pInfo: " << pointInfo[40000].centroidIndex << std::endl;
    // std::cout << "cInfo: " << centInfo[4].count << std::endl;
    // std::cout << "pData: " << pointData[400000] << std::endl;
-   // std::cout << "cData: " << centData[40] << std::endl;
+   // std::cout << "cData: " << centData[40] << std::endl;*/
    // auto start = std::chrono::system_clock::now();
    // warmupGPU(numGPU);
    // //runtime = warumGehtNichts();
@@ -282,18 +321,17 @@ int main(){
    ///* runtime =
    //     startLloydOnCPU(pointInfo, centInfo, pointData, centData,
    //         numPnt, numCent, numDim, 1, maxIter, &ranIter);*/
-   ///* runtime =
+   // runtime =
    //     startSimpleOnGPU(pointInfo, centInfo, pointData, centData,
    //         numPnt, numCent, numGrp, numDim, maxIter, numGPU,
-   //         &ranIter);*/
+   //         &ranIter);
 
-   ///* runtime =
+   // /*runtime =
    //     startSuperOnGPU(pointInfo, centInfo, pointData, centData,
    //         numPnt, numCent, numDim, maxIter, numGPU, &ranIter);*/
-   // runtime =
+   ///* runtime =
    //     startSimpleOnCPU(pointInfo, centInfo, pointData, centData, numPnt,
-   //         numCent, numGrp, numDim, numThread, maxIter, &ranIter);
-
+   //         numCent, numGrp, numDim, numThread, maxIter, &ranIter);*/
 
    // auto end = std::chrono::system_clock::now();
    // std::cout << "alg run end" << std::endl;
@@ -301,18 +339,21 @@ int main(){
    // std::cout << "Sekunden: " << elapsed_seconds.count() << "\n";
    // std::cout << "ITERATIONS: " << ranIter << std::endl;
 
+   // for (int i = 0; i < 20; i++) {
+   //     std::cout << "Assignment: " << i << " -> " << pointInfo[i].centroidIndex << std::endl;
+   // }
    // free(pointData);
    // free(centData);
    // free(pointInfo);
    // free(centInfo);
-   
-     // cudaDeviceReset must be called before exiting in order for profiling and
-     // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    auto res = cudaDeviceReset();
-    if (res != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceReset failed!");
-        return 1;
-    }
+   //
+   //  // cudaDeviceReset must be called before exiting in order for profiling and
+   //  // tracing tools such as Nsight and Visual Profiler to show complete traces.
+   // auto res = cudaDeviceReset();
+   // if (res != cudaSuccess) {
+   //     fprintf(stderr, "cudaDeviceReset failed!");
+   //     return 1;
+   // }
 
     return 0;
 }

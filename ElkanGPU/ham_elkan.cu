@@ -7,7 +7,7 @@
  // -lineinfo  cuda c++ comand line
 
 #include "ham_elkan.h"
-#include "gpufunctions.h"
+//#include "gpufunctions.h"
 #include "general_functions.h"
 #include <cmath>
 #include <chrono>
@@ -18,7 +18,7 @@
 #define Time 0
 #define Countdistance 0
 
-#define GPUALL 1
+#define GPUALL 0
 #if GPUALL
 #define GPUA 1
 #define GPUB 1
@@ -112,15 +112,16 @@ int HamElkan::runThread(int threadId, int maxIterations) {
 
 #if GPUC
     gpuErrchk(cudaMemcpy(x->d_data, x->data, (n * d) * sizeof(double), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(d_lower, lower, n * sizeof(double), cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(d_upper, upper, n * sizeof(double), cudaMemcpyHostToDevice));
+    //gpuErrchk(cudaMemcpy(d_lower, lower, n * sizeof(double), cudaMemcpyHostToDevice));
+    //gpuErrchk(cudaMemcpy(d_upper, upper, n * sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(d_assignment, assignment, n * sizeof(unsigned short), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(centers->d_data, centers->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(sumNewCenters[0]->d_data, sumNewCenters[0]->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(d_clusterSize, clusterSize[0], k * sizeof(int), cudaMemcpyHostToDevice));
     //gpuErrchk(cudaMemcpy(d_lastExactCentroid, lastExactCentroid, (n * d) * sizeof(int), cudaMemcpyHostToDevice));
 
-    std::cout << "Uppper: " << upper[0] << std::endl;
+    /*std::cout << "Uppper: " << upper[0] << std::endl;
+    std::cout << "Uppper: " << lower[0] << std::endl;*/
     const int nC = endNdx;
     const int blockSizeC = 3 * 32;
     const int numBlocksC = (nC + blockSizeC - 1) / blockSizeC;
@@ -137,14 +138,15 @@ int HamElkan::runThread(int threadId, int maxIterations) {
     while ((iterations < maxIterations) && !(*convergedd)) {
         //while ((iterations < maxIterations) && !converged) {
         *convergedd = true,
-            ++iterations;
+        ++iterations;
 
-        update_center_dists(threadId);
+        //update_center_dists(threadId);
 
-#if GPUC    
-       
+#if GPUC                          //!!!!!!!!!!!!!!!
         elkanFunHam << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment,
             d_lower, d_upper, d_s, d_centerCenterDistDiv2, k, d, endNdx, d_closest2);
+       // elkanFunHamFewerRules << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment,
+       //     d_lower, d_upper, d_s, d_centerCenterDistDiv2, k, d, endNdx, d_closest2);
         changeAss << <numBlocksC, blockSizeC >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nC, 0);
 
 #else
@@ -206,8 +208,10 @@ int HamElkan::runThread(int threadId, int maxIterations) {
         }
     }
 
-    cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
-    std::ofstream myfile;
+    /*cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
+    for (int i = 0; i < 20; i++)
+        std::cout << "assignment: " << assignment[i] << std::endl;*/
+    //std::ofstream myfile;
    // myfile.open("example2.txt");
    // 
    // for (int i = 0; i < n; i++)
@@ -217,7 +221,6 @@ int HamElkan::runThread(int threadId, int maxIterations) {
    //     std::cout << "assignment: " << assignment[i] << std::endl;*/
 
    // myfile.close();
-    std::cout << "assignment: " << assignment[24] << std::endl;
     cudaFree(d_closest2);
     cudaFree(d_converged);
     cudaFree(d_check);
@@ -246,7 +249,7 @@ void HamElkan::update_bounds(int startNdx, int endNdx) {
 #endif
 }
 
-void HamElkan::initialize(Dataset const* aX, unsigned short aK, unsigned short* initialAssignment, double* low, int aNumThreads) {
+void HamElkan::initialize(Dataset const* aX, unsigned short aK, unsigned short* initialAssignment, int aNumThreads) {
     std::cout << "ElkanKmeans init" << std::endl;
     numLowerBounds = aK;
     TriangleInequalityBaseKmeans::initialize(aX, aK, initialAssignment, aNumThreads);
@@ -259,23 +262,56 @@ void HamElkan::initialize(Dataset const* aX, unsigned short aK, unsigned short* 
     std::fill(centerCenterDistDiv2, centerCenterDistDiv2 + k * k, 0.0);
 
     lower = new double[n];
-    for (int i = 0; i < n; i++) {
-        lower[i] = low[i];
-    }
 }
 
 void HamElkan::free() {
     TriangleInequalityBaseKmeans::free();
-    //delete[] centerCenterDistDiv2;
     cudaFree(d_centerCenterDistDiv2);
     cudaFree(d_lower);
-
 
     delete centerCenterDistDiv2;
     delete lower;
 
-
     centerCenterDistDiv2 = NULL;
-    //delete centers;
-    //centers = NULL;
 }
+
+
+
+
+
+//
+//
+//__global__ void elkanFunFB(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+//    double* s, double* centerCenterDistDiv2, double* oldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2) {
+//
+//    int i = blockIdx.x * blockDim.x + threadIdx.x;
+//    if (i < n) {
+//        //unsigned short closest = assignment[i];
+//        closest2[i] = assignment[i];
+//        bool r = true;
+//
+//        if (upper[i] > s[closest2[i]]) {
+//            for (int j = 0; j < k; ++j) {
+//                if (j == closest2[i]) { continue; }
+//                if (upper[i] <= lower[i * k + j]) { continue; }
+//                if (upper[i] <= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i]) { continue; }
+//
+//                // ELKAN 3(a)
+//                if (r) {
+//                    upper[i] = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+//                    lower[i * k + closest2[i]] = upper[i];
+//                    r = false;
+//
+//                }
+//
+//                lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
+//                if (lower[i * k + j] < upper[i]) {
+//                    closest2[i] = j;
+//                    upper[i] = lower[i * k + j];
+//                }
+//            }
+//        }
+//        
+//
+//    }
+//}

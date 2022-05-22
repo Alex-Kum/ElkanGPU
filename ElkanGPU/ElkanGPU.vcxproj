@@ -84,6 +84,8 @@
     <CudaCompile Include="elkan_kmean.cu" />
     <CudaCompile Include="FB1_elkan_kmeans.cu" />
     <CudaCompile Include="ham_elkan.cu" />
+    <CudaCompile Include="ham_elkanFB.cu" />
+    <CudaCompile Include="ham_elkanMO.cu" />
     <CudaCompile Include="kernel.cu" />
     <CudaCompile Include="MO_elkan_kmeans.cu" />
     <CudaCompile Include="yy_kmean.cu" />
@@ -95,6 +97,8 @@
     <ClInclude Include="general_functions.h" />
     <ClInclude Include="gpufunctions.h" />
     <ClInclude Include="ham_elkan.h" />
+    <ClInclude Include="ham_elkanFB.h" />
+    <ClInclude Include="ham_elkanMO.h" />
     <ClInclude Include="kmeans.h" />
     <ClInclude Include="MO_elkan_kmeans.h" />
     <ClInclude Include="original_space_kmeans.h" />

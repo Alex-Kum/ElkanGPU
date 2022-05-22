@@ -1,6 +1,7 @@
 //#include "yy_kmean.h"
 //#include "gpufunctions.h"
 //#include "omp.h"
+//#include <vector>
 //
 //
 //#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -13,6 +14,91 @@
 //    }
 //}
 //
+//DTYPE calcDiss(DTYPE* vec1,
+//    DTYPE* vec2,
+//    const int numDim)
+//{
+//    unsigned int index;
+//    DTYPE total = 0.0;
+//    DTYPE square;
+//
+//    for (index = 0; index < numDim; index++)
+//    {
+//        square = (vec1[index] - vec2[index]);
+//        total += square * square;
+//    }
+//
+//    return sqrt(total);
+//}
+//
+//bool verifyYY(DTYPE* pointData, DTYPE* centData, PointInfo* pointInfo, int n, int k, int dim) {
+//    for (int i = 0; i < n; i++) {
+//        int closest = pointInfo[i].centroidIndex;
+//        double closest_dist2 = calcDiss(&pointData[i * dim], &centData[pointInfo[i].centroidIndex * dim], dim);
+//        double original_closest_dist2 = closest_dist2;
+//        for (int j = 0; j < k; ++j) {
+//            if (j == closest) {
+//                continue;
+//            }
+//            double d2 = calcDiss(&pointData[i * dim], &centData[pointInfo[j].centroidIndex * dim], dim);
+//
+//            if (d2 < closest_dist2) {
+//                closest = j;
+//                closest_dist2 = d2;
+//            }
+//        }
+//
+//        if (closest != pointInfo[i].centroidIndex) {
+//            std::cerr << "assignment error:" << std::endl;
+//            std::cerr << "point index           = " << i << std::endl;
+//            std::cerr << "closest center        = " << closest << std::endl;
+//            std::cerr << "closest center dist2  = " << closest_dist2 << std::endl;
+//            std::cerr << "assigned center       = " << pointInfo[i].centroidIndex << std::endl;
+//            std::cerr << "assigned center dist2 = " << original_closest_dist2 << std::endl;
+//            return false;
+//        }
+//    }
+//    return true;
+//}
+//
+//int generateCentWithDataSame(CentInfo* centInfo,
+//    DTYPE* centData,
+//    DTYPE* copyData,
+//    const int numCent,
+//    const int numCopy,
+//    const int numDim)
+//{
+//    //srand(90);
+//    int* chosen_pts = new int[numCent];
+//    for (int i = 0; i < numCent; ++i) {
+//        bool acceptable = true;
+//        do {
+//            acceptable = true;
+//            auto ran = rand() % numCopy;
+//            //std::cout << "Rand: " << i << " = " << ran << std::endl;
+//            chosen_pts[i] = ran;
+//            for (int j = 0; j < i; ++j) {
+//                if (chosen_pts[i] == chosen_pts[j]) {
+//                    acceptable = false;
+//                    break;
+//                }
+//            }
+//        } while (!acceptable);
+//        //double* cdp = centData + i * numDim;
+//        //memcpy(cdp, centData + chosen_pts[i] * numDim, sizeof(double) * numDim);
+//        for (int j = 0; j < numDim; j++) {
+//            centData[i * numDim + j] =
+//                copyData[chosen_pts[i] * numDim + j];
+//        }
+//        centInfo[i].groupNum = -1;
+//        centInfo[i].drift = 0.0;
+//        centInfo[i].count = 0;
+//    }
+//    delete[] chosen_pts;
+//    return 0;
+//}
+//
+//
 //int generateCentWithData(CentInfo* centInfo,
 //    DTYPE* centData,
 //    DTYPE* copyData,
@@ -20,7 +106,7 @@
 //    const int numCopy,
 //    const int numDim)
 //{
-//    srand(90);
+//    //srand(90);
 //    int i;
 //    int j;
 //    int randomMax = numCopy / numCent;
@@ -28,7 +114,7 @@
 //    {
 //        for (j = 0; j < numDim; j++)
 //        {
-//            centData[(i * numDim) + j] =
+//            centData[(i * numDim) + j] =                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
 //                copyData[((i * randomMax) +
 //                    (rand() % randomMax)) * numDim + j];
 //        }
@@ -51,11 +137,12 @@
 //
 //    unsigned int iterIndex, centIndex, grpIndex, dimIndex, assignment;
 //
-//    const int numDimm = 10;
-//    const int numGrpp = 20;
+//   /* const int numDimm = 10;
+//    const int numGrpp = 20;*/
 //    DTYPE currMin = INFINITY;
 //    DTYPE currDistance = INFINITY;
-//    DTYPE origVec[numGrpp][numDimm];
+//    //DTYPE origVec[numGrp][numDim];
+//    DTYPE* origVec = (DTYPE*)malloc(sizeof(DTYPE) * numGrp * numDim);
 //
 //    for (iterIndex = 0; iterIndex < 5; iterIndex++)
 //    {
@@ -80,7 +167,7 @@
 //        {
 //            for (dimIndex = 0; dimIndex < numDim; dimIndex++)
 //            {
-//                origVec[grpIndex][dimIndex] =
+//                origVec[(grpIndex * numDim) + dimIndex] =
 //                    overData[(grpIndex * numDim) + dimIndex];
 //                overData[(grpIndex * numDim) + dimIndex] = 0.0;
 //            }
@@ -115,13 +202,14 @@
 //                for (dimIndex = 0; dimIndex < numDim; dimIndex++)
 //                {
 //                    overData[(grpIndex * numDim) + dimIndex] =
-//                        origVec[grpIndex][dimIndex];
+//                        origVec[(grpIndex * numDim) + dimIndex];
 //                }
 //            }
 //        }
 //    }
 //    free(overData);
 //    free(overInfo);
+//    free(origVec);
 //    return 0;
 //}
 //
@@ -858,8 +946,31 @@
 //                devMaxDriftArr[gpuIter],
 //                numPnts[gpuIter], numCent,
 //                numGrp, numDim);
-//
 //        }
+//
+//        /*gpuErrchk(cudaMemcpy(pointInfo + (0 * numPnt / numGPU),
+//            devPointInfo[0],            
+//            (numPnts[0]) * sizeof(PointInfo),
+//            cudaMemcpyDeviceToHost));
+//        gpuErrchk(cudaMemcpy(centData,
+//            devCentData[0], sizeof(DTYPE)* numCent* numDim,
+//            cudaMemcpyDeviceToHost));
+//        gpuErrchk(cudaMemcpy(pointInfo + (0 * numPnt / numGPU),
+//            devPointInfo[0],            
+//            (numPnts[0]) * sizeof(PointInfo),
+//            cudaMemcpyDeviceToHost));
+//        verifyYY(pointData, centData, pointInfo, numPnt, numCent, numDim);
+//        gpuErrchk(cudaMemcpy(devPointInfo[0],
+//            pointInfo + (0 * numPnt / numGPU),
+//            (numPnts[0]) * sizeof(PointInfo),
+//            cudaMemcpyHostToDevice));
+//        gpuErrchk(cudaMemcpy(devCentData[0],
+//            centData, sizeof(DTYPE) * numCent * numDim,
+//            cudaMemcpyHostToDevice));
+//        gpuErrchk(cudaMemcpy(devPointInfo[0],
+//            pointInfo + (0 * numPnt / numGPU),
+//            (numPnts[0]) * sizeof(PointInfo),
+//            cudaMemcpyHostToDevice));*/
 //
 //        for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
 //        {
