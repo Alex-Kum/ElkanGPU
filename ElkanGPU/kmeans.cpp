@@ -179,7 +179,7 @@ void Kmeans::verifyAssignment(int iteration, int startNdx, int endNdx) const {
 
         // if we have found a discrepancy, then print out information and crash
         // the program
-       /* if (closest != assignment[i]) {
+        if (closest != assignment[i]) {
             std::cerr << "assignment error:" << std::endl;
             std::cerr << "iteration             = " << iteration << std::endl;
             std::cerr << "point index           = " << i << std::endl;
@@ -188,7 +188,7 @@ void Kmeans::verifyAssignment(int iteration, int startNdx, int endNdx) const {
             std::cerr << "assigned center       = " << assignment[i] << std::endl;
             std::cerr << "assigned center dist2 = " << original_closest_dist2 << std::endl;
             assert(false);
-        }*/
+        }
     }
 #endif
 }

@@ -49,3 +49,32 @@ protected:
 };
 
 #endif
+
+
+
+//__global__ void elkanFunFBHam(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+//    double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2) {
+//
+//    int i = blockIdx.x * blockDim.x + threadIdx.x;
+//    if (i < n) {
+//        closest2[i] = assignment[i];
+//        if (upper[i] > s[closest2[i]] && upper[i] >= lower[i] && upper[i] >= maxoldcenter2newcenterDis[assignment[i]] - ub_old[i]) {
+//            double closestDistance = INFINITY;
+//            double secondClosestDist = INFINITY;
+//
+//            for (int j = 0; j < k; ++j) {
+//                double curDistance = sqrt(innerProdp2c(data, center, i, j, dim));
+//                if (curDistance < closestDistance) {
+//                    secondClosestDist = closestDistance;
+//                    closestDistance = curDistance;
+//                    closest2[i] = j;
+//                }
+//                else if (curDistance < secondClosestDist) {
+//                    secondClosestDist = curDistance;
+//                }
+//            }
+//            upper[i] = closestDistance;
+//            lower[i] = secondClosestDist; 
+//        }
+//    }
+//}

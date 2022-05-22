@@ -74,7 +74,7 @@ Dataset* init_centers(Dataset const& x, unsigned short k) {
         do {
             acceptable = true;
             auto ran = rand() % x.n;
-            //std::cout << "Rand: " << i << " = " << ran << std::endl;
+            //::cout << "Rand: " << i << " = " << ran << std::endl;
             chosen_pts[i] = ran;
             for (int j = 0; j < i; ++j) {
                 if (chosen_pts[i] == chosen_pts[j]) {
@@ -83,12 +83,16 @@ Dataset* init_centers(Dataset const& x, unsigned short k) {
                 }
             }
         } while (!acceptable);
+        //std::cout << "chosen: " << chosen_pts[i] << "data chosen: " << x.data[chosen_pts[i] * x.d] << std::endl;
         double* cdp = c->data + i * x.d;
         memcpy(cdp, x.data + chosen_pts[i] * x.d, sizeof(double) * x.d);
+        //std::cout << "memcpy: " << x.data[chosen_pts[i] * x.d] << std::endl;
         //if (c->sumDataSquared) {
         //    c->sumDataSquared[i] = std::inner_product(cdp, cdp + *x.d, cdp, 0.0);
-        //}
+        //}  
     }
+   /* for (int i = 0; i < 20; i++)
+        std::cout << "initCenter: " << c->data[i * x.d] << std::endl;*/
 
     delete[] chosen_pts;
 
