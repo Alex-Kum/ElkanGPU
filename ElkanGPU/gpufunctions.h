@@ -1511,7 +1511,7 @@ __global__ void elkanFunHamFewerRules(double* data, double* center, unsigned sho
 
 
 __global__ void elkanFunNoMove(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int offset) {
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int offset) {
 
     int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
 
