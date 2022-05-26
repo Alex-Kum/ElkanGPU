@@ -188,6 +188,7 @@ int FB1_ElkanKmeans::runThread(int threadId, int maxIterations) {
         const int n = centers->n * centers->n;
         const int blockSize = 1 * 32;
         const int numBlocks = (n + blockSize - 1) / blockSize;
+        cudaMemset(d_oldcenter2newcenterDis, 0.0, (k * k) * sizeof(double));
         elkanFBMoveAddition << <numBlocks, blockSize >> > (d_oldcenters, d_oldcenter2newcenterDis, centers->d_data, d, k, centers->n);
 #else
         int furthestMovingCenter = move_centers_newbound(oldcenters, oldcenter2newcenterDis);

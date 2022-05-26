@@ -205,6 +205,7 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
         const int n = centers->n * centers->n;
         const int blockSize = 1 * 32;
         const int numBlocks = (n + blockSize - 1) / blockSize;
+        cudaMemset(d_oldcenter2newcenterDis, 0.0, (k * k) * sizeof(double));
         elkanFBMoveAddition << <numBlocks, blockSize >> > (d_oldcenters, d_oldcenter2newcenterDis, centers->d_data, d, k, centers->n);
         elkanFBMoveAdditionHam << <centers->n,1>> > (d_oldcenters, d_oldcenter2newcenterDis, d_maxoldcenter2newcenterDis, k, centers->n);
 #else

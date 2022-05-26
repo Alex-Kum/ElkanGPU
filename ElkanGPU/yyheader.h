@@ -15,6 +15,7 @@ typedef struct PointInfo
 
     //The current upper bound
     DTYPE uprBound;
+    //DTYPE oldUprBound;
 }point;
 
 typedef struct CentInfo {

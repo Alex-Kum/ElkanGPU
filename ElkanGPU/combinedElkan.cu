@@ -1,9 +1,3 @@
-/* Authors: Greg Hamerly and Jonathan Drake
- * Feedback: hamerly@cs.baylor.edu
- * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
- * Copyright 2014
- */
-
 #include "CO_elkan_kmeans.h"
 #include "general_functions.h"
 #include "gpufunctions.h"
@@ -34,12 +28,12 @@ void CO_ElkanKmeans::update_center_dists(int threadId) {
     const int blockSize = 3 * 32;
     const int numBlocks = (n + blockSize - 1) / blockSize;
     cudaMemset(d_s, std::numeric_limits<double>::max(), k * sizeof(double));
-    if (iterations > changeIter){
+    //if (iterations > changeIter){
         innerProdMO << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_oldcenterCenterDistDiv2, d_s, centers->d_data, centers->d, k, centers->n);
-    }
-    else {
-        innerProd << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_s, centers->d_data, centers->d, centers->n);
-    }
+    //}
+    // else {
+    //     innerProd << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_s, centers->d_data, centers->d, centers->n);
+    // }
 #else
     // find the inter-center distances
     for (int c1 = 0; c1 < k; ++c1) {
@@ -223,10 +217,11 @@ int CO_ElkanKmeans::runThread(int threadId, int maxIterations) {
         elkanMoveCenter << <numBlocksM, blockSizeM >> > (d_centerMovement, d_clusterSize, centers->d_data, sumNewCenters[threadId]->d_data, d_converged, k, d, nM);           
         cudaMemcpy(convergedd, d_converged, 1 * sizeof(bool), cudaMemcpyDeviceToHost);
 
-        if (iterations > changeIter){        
+        if (iterations > changeIter - 1){        
             const int n = centers->n * centers->n;
             const int blockSize = 1 * 32;
             const int numBlocks = (n + blockSize - 1) / blockSize;
+            cudaMemset(d_oldcenter2newcenterDis, 0.0, (k * k) * sizeof(double));
             elkanFBMoveAddition << <numBlocks, blockSize >> > (d_oldcenters, d_oldcenter2newcenterDis, centers->d_data, d, k, centers->n);
         }
 #else
