@@ -168,7 +168,7 @@ int ElkanKmeans::runThread(int threadId, int maxIterations) {
         //elkanParallelCheck << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
          //   d_lower, d_upper, d_s, d_centerCenterDistDiv2, k, d, endNdx, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, 0, d_check);
         elkanFunNoMove << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment, 
-            d_lower, d_upper, d_s, d_centerCenterDistDiv2, k, d, endNdx, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, 0);
+            d_lower, d_upper, d_s, d_centerCenterDistDiv2, k, d, endNdx, d_closest2, 0);
         //elkanFunNoMoveAfterCheck << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment, 
         //    d_lower, d_upper, d_s, d_centerCenterDistDiv2, k, d, endNdx, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, 0, d_check);
         changeAss << <numBlocksC, blockSizeC >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nC, 0);

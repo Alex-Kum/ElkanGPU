@@ -505,6 +505,7 @@ __global__ void assignPointsSimple(PointInfo* pointInfo,
     extern __shared__ unsigned int groupLclArr[];
 
     // update points upper bound
+    //pointInfo[tid].oldUprBound = pointInfo[tid].uprBound;
     pointInfo[tid].uprBound += centInfo[pointInfo[tid].centroidIndex].drift;
 
     // update group lower bounds
@@ -524,6 +525,8 @@ __global__ void assignPointsSimple(PointInfo* pointInfo,
 
     // if the global lower bound is less than the upper bound
     if (tmpGlobLwr < pointInfo[tid].uprBound)
+    //vielleicht auch zweites?
+    //if (tmpGlobLwr < pointInfo[tid].uprBound && pointInfo[tid].uprBound >= oldcenter2newcenterDis[assignment[i] * k + j] - pointInfo[tid].oldUprBound)
     {
         // tighten upper bound ub = d(x, b(x))
         pointInfo[tid].uprBound =
@@ -1015,7 +1018,7 @@ __global__ void elkanFBMoveAddition(double* oldcenters, double* oldcenter2newcen
     int c2 = i % n;
 
     if (c1 != c2 && i < n * n) {
-        oldcenter2newcenterDis[c1 * k + c2] = 0.0;
+        //oldcenter2newcenterDis[c1 * k + c2] = 0.0;
         for (int dim = 0; dim < d; ++dim) {
             oldcenter2newcenterDis[c1 * k + c2] += (oldcenters[c1 * d + dim] - center[c2 * d + dim])  * (oldcenters[c1 * d + dim] - center[c2 * d + dim]);
         }
@@ -1511,7 +1514,7 @@ __global__ void elkanFunHamFewerRules(double* data, double* center, unsigned sho
 
 
 __global__ void elkanFunNoMove(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int offset) {
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int offset) {
 
     int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
 
