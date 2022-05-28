@@ -41,6 +41,8 @@ protected:
     double* oldcenters;
     double* d_oldcenters;
     //double *lower2;
+    bool * d_calculated;
+    double* d_distances;
     double* lower;
     double* d_lower;
     double* ub_old;

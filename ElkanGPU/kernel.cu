@@ -192,14 +192,14 @@ int main(){
    // cudaDeviceProp prop;
    // cudaGetDeviceProperties(&prop, 0);
 
-    int k = 4;
+    int k = 64;
    // * alg = new HamElkan();
     //HamElkan* alg = new HamElkan();
     //ElkanKmeans* alg = new ElkanKmeans();
     //FB1_ElkanKmeans* alg = new FB1_ElkanKmeans();
     //MO_ElkanKmeans* alg = new MO_ElkanKmeans();
-    //HamElkanFB* alg = new HamElkanFB();
-    HamElkanMO* alg = new HamElkanMO();
+    HamElkanFB* alg = new HamElkanFB();
+    //HamElkanMO* alg = new HamElkanMO();
     std::cout << "Alg: " << alg->getName() << std::endl;
     //Dataset* x = load_dataset("C:\\Users\\Admin\\Desktop\\MASTER\\skin_nonskin.txt");
     //Dataset* x = loadDataset("file.txt", 499200, 100);    
