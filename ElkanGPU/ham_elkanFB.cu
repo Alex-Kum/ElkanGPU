@@ -6,13 +6,13 @@
 
 #include "ham_elkanFB.h"
 #include "general_functions.h"
-//#include "gpufunctions.h"
+#include "gpufunctions.h"
 #include <cmath>
 #include <chrono>
 
-#define GPUA 0
-#define GPUB 0
-#define GPUC 0
+#define GPUA 1
+#define GPUB 1
+#define GPUC 1
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
@@ -32,7 +32,7 @@ void HamElkanFB::update_center_dists(int threadId) {
 
     /* cudaMemcpy(centers->d_data, centers->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice);*/
     //innerProdFBHam << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_s, centers->d_data, centers->d, centers->n);
-    //cudaMemset(d_s, std::numeric_limits<double>::max(), k * sizeof(double));
+    cudaMemset(d_s, std::numeric_limits<double>::max(), k * sizeof(double));
     innerProd << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_s, centers->d_data, centers->d, centers->n);
     /* cudaMemcpy(centers->data, centers->d_data, (k * d) * sizeof(double), cudaMemcpyDeviceToHost);
      cudaMemcpy(centerCenterDistDiv2, d_centerCenterDistDiv2, (k * k) * sizeof(double), cudaMemcpyDeviceToHost);
@@ -122,10 +122,10 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
 
 
 #if GPUC  
-        /*calculateFilter << <numBlocksD, blockSizeD >> > (d_assignment, d_lower, d_upper, d_s, d_maxoldcenter2newcenterDis, d_ub_old, d_calculated, n, d_closest2);
+        calculateFilter << <numBlocksD, blockSizeD >> > (d_assignment, d_lower, d_upper, d_s, d_maxoldcenter2newcenterDis, d_ub_old, d_calculated, n, d_closest2);
         elkanFunFBHam2TT << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, endNdx);
         elkanFunFBHamTT << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
-            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2, d_calculated, d_distances);*/
+            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2, d_calculated, d_distances);
 
         //calculateFilter2 << <numBlocksD, blockSizeD >> > (d_assignment, d_lower, d_upper, d_s, d_maxoldcenter2newcenterDis, d_ub_old, d_calculated, n, d_closest2, x->d_data, centers->d_data, d);
        // /*elkanFunFBHam2 << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, endNdx*10);
@@ -146,8 +146,10 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
        // //cudaMemcpy(d_distances, distances, (n * k) * sizeof(double), cudaMemcpyHostToDevice);
        // //cudaMemcpy(d_distances2, distances2, (n * k) * sizeof(double), cudaMemcpyHostToDevice);        
 
-        elkanFunFBHam << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
-            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2);
+        /*elkanFunFBHam << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
+            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2);*/
+
+        //elkanFunLloyd << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment, k, d, endNdx, d_closest2);
 
         changeAss << <numBlocksD, blockSizeD >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nC, 0);
 #else
@@ -221,10 +223,10 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
             update_bounds(startNdx, endNdx);
         }
     }
-     cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
+    /* cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
      for (int i = 0; i < 20; i++) {
          std::cout << "assignment: " << assignment[i] << std::endl;
-     }
+     }*/
 
      std::cout << "ITERATIONEN: " << iterations << std::endl;
     return iterations;

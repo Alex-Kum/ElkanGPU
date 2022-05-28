@@ -81,6 +81,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <CudaCompile Include="combinedElkan.cu" />
     <CudaCompile Include="elkan_kmean.cu" />
     <CudaCompile Include="FB1_elkan_kmeans.cu" />
     <CudaCompile Include="ham_elkan.cu" />
@@ -91,6 +92,7 @@
     <CudaCompile Include="yy_kmean.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="combinedElkan.h" />
     <ClInclude Include="Dataset.h" />
     <ClInclude Include="elkan_kmean.h" />
     <ClInclude Include="FB1_elkan_kmeans.h" />

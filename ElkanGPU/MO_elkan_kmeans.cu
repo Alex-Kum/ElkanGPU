@@ -231,6 +231,7 @@ int MO_ElkanKmeans::runThread(int threadId, int maxIterations) {
         if (!converged) {
 #endif
             update_bounds(startNdx, endNdx);
+            //std::cout << "iter: " << iterations << std::endl;
         }
         synchronizeAllThreads();
 

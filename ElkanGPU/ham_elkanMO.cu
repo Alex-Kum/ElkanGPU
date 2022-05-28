@@ -71,6 +71,8 @@ int HamElkanMO::runThread(int threadId, int maxIterations) {
     cudaMalloc(&d_oldcenterCenterDistDiv2, (k * k) * sizeof(double));
     std::fill(oldcenterCenterDistDiv2, oldcenterCenterDistDiv2 + k * k, 0.0);
 
+    cudaMalloc(&d_calculated, n * sizeof(bool));
+    cudaMalloc(&d_distances, (n * k) * sizeof(double));
     
     cudaMalloc(&d_maxoldcenterCenterDistDiv2, k * sizeof(double));
     double* d_maxcenterMovement;
@@ -97,9 +99,14 @@ int HamElkanMO::runThread(int threadId, int maxIterations) {
     gpuErrchk(cudaMemcpy(sumNewCenters[0]->d_data, sumNewCenters[0]->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(d_clusterSize, clusterSize[0], k * sizeof(int), cudaMemcpyHostToDevice));
 
-    const int nC = endNdx;
+    const int nC = endNdx * k;
+    //std::cout << "nc: " << nC << std::endl;
     const int blockSizeC = 3 * 32;
-    const int numBlocksC = (n + blockSizeC - 1) / blockSizeC;
+    const int numBlocksC = (nC + blockSizeC - 1) / blockSizeC;
+
+    const int nD = endNdx;
+    const int blockSizeD = 3 * 32;
+    const int numBlocksD = (n + blockSizeD - 1) / blockSizeD;
 
     const int nM = centers->n;
     const int blockSizeM = 1 * 32;
@@ -118,12 +125,16 @@ int HamElkanMO::runThread(int threadId, int maxIterations) {
 
 
 #if GPUC  
-        
-        elkanFunMOHam << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment,
-            d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_maxoldcenterCenterDistDiv2, d_ub_old, d_centerMovement, k, d, endNdx, d_closest2);
+        //hammo
+       /* elkanFunMOHam << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
+            d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_maxoldcenterCenterDistDiv2, d_ub_old, d_maxcenterMovement, k, d, endNdx, d_closest2);*/
 
+        //hammoKfun
+        calculateFilterMO << <numBlocksD, blockSizeD >> > (d_assignment, d_upper, d_s, d_maxoldcenter2newcenterDis, d_ub_old, d_calculated, n, d_closest2, d_maxoldcenterCenterDistDiv2, d_maxcenterMovement);
+        elkanFunMOHamKCalc << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, nC);
+        elkanFunMOHamBounds << <numBlocksD, blockSizeD >> > (d_upper, d_distances, d_calculated, k, d, n, d_closest2);
 
-        changeAss << <numBlocksC, blockSizeC >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nC, 0);
+        changeAss << <numBlocksD, blockSizeD >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nD, 0);
 #else
         for (int i = startNdx; i < endNdx; ++i) {
             unsigned short closest = assignment[i];
@@ -273,6 +284,8 @@ void HamElkanMO::free() {
     cudaFree(d_oldcenters);
     cudaFree(d_oldcenter2newcenterDis);
     cudaFree(d_maxoldcenter2newcenterDis);
+    cudaFree(d_calculated);
+    cudaFree(d_distances);
     delete centerCenterDistDiv2;
     delete lower;
     delete ub_old;
