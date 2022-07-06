@@ -35,7 +35,7 @@ protected:
 
     // Keep track of the distance (divided by 2) between each pair of
     // points.
-    const int changeIter = 20;
+    const int changeIter = 35;
     int iterations;
     double* centerCenterDistDiv2;
     double* d_centerCenterDistDiv2;

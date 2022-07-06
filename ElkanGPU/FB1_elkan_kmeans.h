@@ -10,7 +10,6 @@
  * distance calculations.
  */
 
-
 #include "triangle_inequality_base_kmeans.h"
 
 class FB1_ElkanKmeans : public TriangleInequalityBaseKmeans {

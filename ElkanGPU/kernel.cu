@@ -18,6 +18,7 @@
 #include "yy_kmean.h"
 #include "FB1_elkan_kmeans.h"
 #include "MO_elkan_kmeans.h"
+#include "combinedElkan.h"
 
 #include <fstream>
 #include <stdio.h>
@@ -96,8 +97,8 @@ int importPoints(
     fstream file;
     //file.open("file.txt", ios::in);
     //file.open("gassensor_clean.data", ios::in);
-    //file.open("KEGGNetwork_clean.data", ios::in);    
-    file.open("USCensus_clean.data", ios::in);
+    file.open("KEGGNetwork_clean.data", ios::in);    
+    //file.open("USCensus_clean.data", ios::in);
     int i = 0;
     while (getline(file, number, ','))
     {
@@ -192,17 +193,8 @@ int main(){
    // cudaDeviceProp prop;
    // cudaGetDeviceProperties(&prop, 0);
 
-    int k = 64;
-   // * alg = new HamElkan();
-    //HamElkan* alg = new HamElkan();
-    //ElkanKmeans* alg = new ElkanKmeans();
-    //FB1_ElkanKmeans* alg = new FB1_ElkanKmeans();
-    //MO_ElkanKmeans* alg = new MO_ElkanKmeans();
-    HamElkanFB* alg = new HamElkanFB();
-    //HamElkanMO* alg = new HamElkanMO();
-    std::cout << "Alg: " << alg->getName() << std::endl;
-    //Dataset* x = load_dataset("C:\\Users\\Admin\\Desktop\\MASTER\\skin_nonskin.txt");
-    //Dataset* x = loadDataset("file.txt", 499200, 100);    
+    
+    //int clusters[] = { 4,16,64,265 };
     //Dataset* x = loadDataset("KEGGNetwork_clean.data", 65554, 28);
     Dataset* x = loadDataset("USCensus_clean.data", 2458285, 68);
     //Dataset* x = loadDataset("gassensor_clean.data", 13910, 128);
@@ -211,31 +203,55 @@ int main(){
         return 0;
     }
     cout << "Dataset loaded" << endl;
-    Dataset* initialCenters = init_centers(*x, k);
-    unsigned short* assignment = new unsigned short[x->n];
-    double* low = new double[x->n];
 
+    vector< std::chrono::duration<double>> results;
+        int k = 64;
+        cout << "k: " << k << endl;
+        Dataset* initialCenters = init_centers(*x, k);
+        for (int i = 0; i < 1; i++) {                        
+            // * alg = new HamElkan();
+            //HamElkan* alg = new HamElkan();
+            //ElkanKmeans* alg = new ElkanKmeans();
+            //FB1_ElkanKmeans* alg = new FB1_ElkanKmeans();
+            MO_ElkanKmeans* alg = new MO_ElkanKmeans();
+            //HamElkanFB* alg = new HamElkanFB();
+            //HamElkanMO* alg = new HamElkanMO();
+            //CO_ElkanKmeans* alg = new CO_ElkanKmeans();
+            std::cout << "Alg: " << alg->getName() << std::endl;
+            //Dataset* x = load_dataset("C:\\Users\\Admin\\Desktop\\MASTER\\skin_nonskin.txt");
+            //Dataset* x = loadDataset("file.txt", 499200, 100);   
 
-    assign(*x, *initialCenters, assignment);
-    alg->initialize(x, k, assignment, 1);
+            
+            unsigned short* assignment = new unsigned short[x->n];
 
-    /*assignLow(*x, *initialCenters, assignment, low);
-    alg->initialize(x, k, assignment, low, 1);*/
+            assign(*x, *initialCenters, assignment);
+            alg->initialize(x, k, assignment, 1);
+            //std::cout << "assignment 0" << assignment[0] << std::endl;
 
-    auto start = std::chrono::system_clock::now();
-    std::cout << "alg run start" << std::endl;
-    int iterations = alg->run(5000);
-    std::cout << "alg run end" << std::endl;
-    std::cout << "Iterations: " << iterations << std::endl;
-    auto end = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    std::cout << "Sekunden: " << elapsed_seconds.count() << "\n";
-   
+            auto start = std::chrono::system_clock::now();
+            std::cout << "alg run start" << std::endl;
+            int iterations = alg->run(5000);
+            std::cout << "alg run end" << std::endl;
+            std::cout << "Iterations: " << iterations << std::endl;
+            auto end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            results.push_back(elapsed_seconds);
+            std::cout << "Sekunden: " << elapsed_seconds.count() << "\n";
+
+            delete[] assignment;
+            delete alg;    
+        }
+        delete initialCenters;
+    
     cudaDeviceSynchronize();
 
-    delete[] assignment;
-    delete[] low;
-    delete alg;
+    int counter = 0;
+    for (auto& e : results) {
+        cout << e.count() << ", ";
+        counter++;        
+    }
+    cout << endl;
+   
     delete x;
     cudaDeviceReset();
 

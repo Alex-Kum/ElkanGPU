@@ -6,13 +6,13 @@
 
 #include "ham_elkanFB.h"
 #include "general_functions.h"
-#include "gpufunctions.h"
+//#include "gpufunctions.h"
 #include <cmath>
 #include <chrono>
 
-#define GPUA 1
-#define GPUB 1
-#define GPUC 1
+#define GPUA 0
+#define GPUB 0
+#define GPUC 0
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
@@ -79,7 +79,7 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
     double* distances = new double[n * k];
     double* distances2 = new double[n * k];
     cudaMalloc(&d_calculated, n * sizeof(bool));
-    cudaMalloc(&d_distances, (n*k) * sizeof(double));
+    cudaMalloc(&d_distances, (n * k) * sizeof(double));
     //cudaMalloc(&d_distances2, (n * k) * sizeof(double));
 
     converged = false;
@@ -96,7 +96,7 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
     gpuErrchk(cudaMemcpy(sumNewCenters[0]->d_data, sumNewCenters[0]->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(d_clusterSize, clusterSize[0], k * sizeof(int), cudaMemcpyHostToDevice));
 
-    const int nC = endNdx*k;
+    const int nC = endNdx * k;
     std::cout << "nc: " << nC << std::endl;
     const int blockSizeC = 3 * 32;
     const int numBlocksC = (nC + blockSizeC - 1) / blockSizeC;
@@ -108,6 +108,10 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
     const int nM = centers->n;
     const int blockSizeM = 1 * 32;
     const int numBlocksM = (nM + blockSizeM - 1) / blockSizeM;
+
+    unsigned long long int* d_countDistances;
+    gpuErrchk(cudaMalloc(&d_countDistances, 1 * sizeof(unsigned long long int)));
+    cudaMemset(d_countDistances, 0, 1 * sizeof(unsigned long long int));
 
 #endif
 #if GPUC
@@ -122,17 +126,17 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
 
 
 #if GPUC  
-        calculateFilter << <numBlocksD, blockSizeD >> > (d_assignment, d_lower, d_upper, d_s, d_maxoldcenter2newcenterDis, d_ub_old, d_calculated, n, d_closest2);
+        /*calculateFilter << <numBlocksD, blockSizeD >> > (d_assignment, d_lower, d_upper, d_s, d_maxoldcenter2newcenterDis, d_ub_old, d_calculated, n, d_closest2);
         elkanFunFBHam2TT << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, endNdx);
         elkanFunFBHamTT << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
-            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2, d_calculated, d_distances);
+            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2, d_calculated, d_distances);*/
 
         //calculateFilter2 << <numBlocksD, blockSizeD >> > (d_assignment, d_lower, d_upper, d_s, d_maxoldcenter2newcenterDis, d_ub_old, d_calculated, n, d_closest2, x->d_data, centers->d_data, d);
        // /*elkanFunFBHam2 << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, endNdx*10);
         //elkanFunFBHamBounds << <numBlocksD, blockSizeD >> > (x->d_data, d_lower, d_upper, d_distances, d_calculated, k, d, n, d_closest2);*/
 
        //// elkanFunFBHam2 << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_distances2, d_calculated, k, d, endNdx);
-        
+
 
        // //cudaMemcpy(distances, d_distances, (n * k) * sizeof(double), cudaMemcpyDeviceToHost);
        // //cudaMemcpy(distances2, d_distances2, (n * k) * sizeof(double), cudaMemcpyDeviceToHost);
@@ -146,10 +150,10 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
        // //cudaMemcpy(d_distances, distances, (n * k) * sizeof(double), cudaMemcpyHostToDevice);
        // //cudaMemcpy(d_distances2, distances2, (n * k) * sizeof(double), cudaMemcpyHostToDevice);        
 
-        /*elkanFunFBHam << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
-            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2);*/
+        elkanFunFBHam << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
+            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2, d_countDistances);
 
-        //elkanFunLloyd << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment, k, d, endNdx, d_closest2);
+            //elkanFunLloyd << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment, k, d, endNdx, d_closest2);
 
         changeAss << <numBlocksD, blockSizeD >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nC, 0);
 #else
@@ -209,7 +213,7 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
         const int numBlocks = (n + blockSize - 1) / blockSize;
         cudaMemset(d_oldcenter2newcenterDis, 0.0, (k * k) * sizeof(double));
         elkanFBMoveAddition << <numBlocks, blockSize >> > (d_oldcenters, d_oldcenter2newcenterDis, centers->d_data, d, k, centers->n);
-        elkanFBMoveAdditionHam << <centers->n,1>> > (d_oldcenters, d_oldcenter2newcenterDis, d_maxoldcenter2newcenterDis, k, centers->n);
+        elkanFBMoveAdditionHam << <centers->n, 1 >> > (d_oldcenters, d_oldcenter2newcenterDis, d_maxoldcenter2newcenterDis, k, centers->n);
 #else
         int furthestMovingCenter = move_centers_newbound(oldcenters, oldcenter2newcenterDis);
         converged = (0.0 == centerMovement[furthestMovingCenter]);
@@ -222,15 +226,15 @@ int HamElkanFB::runThread(int threadId, int maxIterations) {
 #endif
             update_bounds(startNdx, endNdx);
         }
-    }
+        }
     /* cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
      for (int i = 0; i < 20; i++) {
          std::cout << "assignment: " << assignment[i] << std::endl;
      }*/
 
-     std::cout << "ITERATIONEN: " << iterations << std::endl;
+    std::cout << "ITERATIONEN: " << iterations << std::endl;
     return iterations;
-}
+    }
 
 void HamElkanFB::update_bounds(int startNdx, int endNdx) {
 #if GPUB
@@ -278,12 +282,12 @@ void HamElkanFB::initialize(Dataset const* aX, unsigned short aK, unsigned short
     oldcenter2newcenterDis = new double[k * k];
     cudaMalloc(&d_oldcenter2newcenterDis, (k * k) * sizeof(double));
     std::fill(oldcenter2newcenterDis, oldcenter2newcenterDis + k * k, 0.0);
-    cudaMalloc(&d_maxoldcenter2newcenterDis, k  * sizeof(double));
+    cudaMalloc(&d_maxoldcenter2newcenterDis, k * sizeof(double));
     ub_old = new double[n];
     cudaMalloc(&d_ub_old, n * sizeof(double));
     std::fill(ub_old, ub_old + n, std::numeric_limits<double>::max());
     lower = new double[n];
-    cudaMalloc(&d_lower, n  * sizeof(double));
+    cudaMalloc(&d_lower, n * sizeof(double));
     std::fill(lower, lower + n, 0.0);
     oldcenters = new double[k * d];
     cudaMalloc(&d_oldcenters, (k * d) * sizeof(double));

@@ -282,6 +282,7 @@ void assign(Dataset const& x, Dataset const& c, unsigned short* assignment) {
             }
         }
         assignment[i] = closest;
+        //std::cout << "i:" << assignment[i] << std::endl;
     }
 }
 
