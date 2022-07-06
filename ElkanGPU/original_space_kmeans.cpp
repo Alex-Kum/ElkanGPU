@@ -69,7 +69,7 @@ int OriginalSpaceKmeans::move_centers() {
 }
 
 void OriginalSpaceKmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* initialAssignment, int aNumThreads) {
-    std::cout << "originalSpaceKmeans init" << std::endl;
+    //std::cout << "originalSpaceKmeans init" << std::endl;
     Kmeans::initialize(aX, aK, initialAssignment, aNumThreads);
 
     centers = new Dataset(k, d);

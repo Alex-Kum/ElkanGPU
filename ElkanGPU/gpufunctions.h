@@ -7,6 +7,7 @@
 
 #define DTYPE double
 #define BLOCKSIZE 256
+#define DISTANCES 0
 
 __global__ void setTestL(int* test) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -862,6 +863,16 @@ __device__ double dist22(const double* data, const double* center, int x, int y,
     return result;
 }
 
+__device__ double dist33(const double* data, int x, int y, int dim) {
+    double result = 0.0;
+
+    for (int i = 0; i < dim; i++) {
+        double diff = data[x * dim + i] - data[y * dim + i];
+        result += diff * diff;
+    }
+    return result;
+}
+
 /*__global__ void dist2(const double* data, int x, int y, int dim, int n, double* res) {
     double result = 0.0;
 
@@ -949,15 +960,16 @@ __global__ void assignPointsSuper(PointInfo* pointInfo,
 //    }
 //}
 
-__global__ void innerProdMOHam(double* centerCenterDist, double* oldcenterCenterDistDiv2, double* maxoldcenterCenterDistDiv2, double* s, const double* data, int dim, int k, int n) {
+__global__ void innerProdMOHam(double* centerCenterDist, double* oldcenterCenterDistDiv2, double* maxoldcenterCenterDistDiv2, double* s, const double* data, int dim, int k, int n, double* centerMovement) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int c1 = index / n;
     int c2 = index % n;
 
     if (c1 != c2 && index < n * n) {
-        double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
+        //double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
+        double distance = dist33(data, c1, c2, dim);
         oldcenterCenterDistDiv2[c1 * k + c2] = centerCenterDist[c1 * k + c2];
-        maxoldcenterCenterDistDiv2[c1] = s[c1];
+        maxoldcenterCenterDistDiv2[c1] = s[c1] - centerMovement[c1];
         centerCenterDist[index] = sqrt(distance) / 2.0;
         if (centerCenterDist[index] < s[c1]) {
             s[c1] = centerCenterDist[index];
@@ -965,13 +977,15 @@ __global__ void innerProdMOHam(double* centerCenterDist, double* oldcenterCenter
     }
 }
 
+
 __global__ void innerProdMO(double* centerCenterDist, double* oldcenterCenterDistDiv2, double* s, const double* data, int dim, int k, int n) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int c1 = index / n;
     int c2 = index % n;
 
     if (c1 != c2 && index < n * n) {
-        double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
+        //double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
+        double distance = dist33(data, c1, c2, dim);
         oldcenterCenterDistDiv2[c1 * k + c2] = centerCenterDist[c1 * k + c2];
         centerCenterDist[index] = sqrt(distance) / 2.0;
         if (centerCenterDist[index] < s[c1]) {
@@ -1000,7 +1014,8 @@ __global__ void innerProd(double* centerCenterDist, double* s, const double* dat
     int c2 = index % n;
 
     if (c1 != c2 && index < n * n) {
-        double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
+        //double distance = dist(data, c1, c1, dim) - 2 * dist(data, c1, c2, dim) + dist(data, c2, c2, dim);
+        double distance = dist33(data, c1, c2, dim);
         centerCenterDist[index] = sqrt(distance) / 2.0;
         if (centerCenterDist[index] < s[c1]) {
             s[c1] = centerCenterDist[index];
@@ -1050,6 +1065,29 @@ __global__ void elkanFBMoveAdditionHam(double* oldcenters, double* oldcenter2new
     }    
 }
 
+__global__ void updateBoundHamShared(double* data, double* lower, double* upper, double* centerMovement, unsigned short* assignment, int numLowerBounds, int dim, int k, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    __shared__ double movement[256];
+    if (threadIdx.x < 256) {
+        movement[threadIdx.x] = centerMovement[threadIdx.x];
+    }
+    __syncthreads();
+
+    if (i < n) {
+        double maxMovement = 0;
+        upper[i] += movement[assignment[i]];
+
+        for (int j = 0; j < k; ++j) {
+            /*if (j == assignment[i])
+                continue;*/
+            if (movement[j] > maxMovement)
+                maxMovement = movement[j];
+        }
+        lower[i] -= maxMovement;
+    }
+}
+
 __global__ void updateBoundHam(double* data, double* lower, double* upper, double* centerMovement, unsigned short* assignment, int numLowerBounds, int dim, int k, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {        
@@ -1057,14 +1095,16 @@ __global__ void updateBoundHam(double* data, double* lower, double* upper, doubl
         upper[i] += centerMovement[assignment[i]];
 
         for (int j = 0; j < k; ++j) {
-            if (j == assignment[i])
-                continue;
+            /*if (j == assignment[i])
+                continue;*/
             if (centerMovement[j] > maxMovement)
                 maxMovement = centerMovement[j];
         }
         lower[i] -= maxMovement;
     }
 }
+
+
 
 __global__ void updateBound(double* data, double* lower, double* upper, double* centerMovement, unsigned short* assignment, int numLowerBounds, int dim, int k, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -1075,6 +1115,44 @@ __global__ void updateBound(double* data, double* lower, double* upper, double* 
         upper[i] += centerMovement[assignment[i]];
         for (int j = 0; j < k; ++j) {
             lower[i * numLowerBounds + j] -= centerMovement[j];
+        }
+    }
+}
+
+__global__ void updateBoundShared(double* data, double* lower, double* upper, double* centerMovement, unsigned short* assignment, int numLowerBounds, int dim, int k, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    __shared__ double movement[256];
+    if (threadIdx.x < 256) {
+        movement[threadIdx.x] = centerMovement[threadIdx.x];
+    }
+    __syncthreads();
+
+    if (i < n) {
+
+        /*double dist = distp2c(data, lastExactCentroid, i, i, dim);
+        upper[i] = dist;*/
+        upper[i] += movement[assignment[i]];
+        for (int j = 0; j < k; ++j) {
+            lower[i * numLowerBounds + j] -= movement[j];
+        }
+    }
+}
+
+__global__ void updateBoundFBShared(double* lower, double* upper, double* ub_old, double* centerMovement, unsigned short* assignment, int numLowerBounds, int k, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    __shared__ double movement[256];
+    if (threadIdx.x < 256) {
+        movement[threadIdx.x] = centerMovement[threadIdx.x];
+    }
+    __syncthreads();
+
+    if (i < n) {
+        ub_old[i] = upper[i];
+        upper[i] += movement[assignment[i]];
+        for (int j = 0; j < k; ++j) {
+            lower[i * numLowerBounds + j] -= movement[j];
         }
     }
 }
@@ -1135,7 +1213,7 @@ __global__ void elkanFunMOHamKCalc(double* data, double* center, double* distanc
 
     if (c1 < n) {
         if (calculated[c1]) {
-            distances[c1 * k + c2] = sqrt(innerProdp2c(data, center, c1, c2, dim));
+            distances[c1 * k + c2] = sqrt(dist22(data, center, c1, c2, dim));
         }
     }
 }
@@ -1160,16 +1238,22 @@ __global__ void elkanFunMOHamBounds(double* upper, double* distances, bool* calc
 }
 
 __global__ void elkanFunMOHam(double* data, double* center, unsigned short* assignment, double* upper,
-    double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* maxoldcenterCenterDistDiv2, double* ub_old, double* maxcenterMovement, int k, int dim, int n, unsigned short* closest2) {
+    double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* maxoldcenterCenterDistDiv2, double* ub_old, double* maxcenterMovement, int k, int dim, int n, unsigned short* closest2, unsigned long long int* countDistances) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
         closest2[i] = assignment[i];
-        if (upper[i] > s[closest2[i]] && upper[i] >= maxoldcenter2newcenterDis[assignment[i]] - ub_old[i] && upper[i] >= 2.0 * (maxoldcenterCenterDistDiv2[assignment[i]]) - ub_old[i] - *maxcenterMovement) {
+        unsigned long long int c;
+        //if (upper[i] > s[closest2[i]] && upper[i] >= maxoldcenter2newcenterDis[assignment[i]] - ub_old[i] && upper[i] >= 2.0 * (maxoldcenterCenterDistDiv2[assignment[i]]) - ub_old[i] - *maxcenterMovement) {
+        if (upper[i] > s[closest2[i]] && upper[i] >= maxoldcenter2newcenterDis[assignment[i]] - ub_old[i] && upper[i] >= 2.0 * (maxoldcenterCenterDistDiv2[assignment[i]]) - ub_old[i]) {
             double closestDistance = INFINITY;
 
             for (int j = 0; j < k; ++j) {
-                double curDistance = sqrt(innerProdp2c(data, center, i, j, dim));
+                double curDistance = sqrt(dist22(data, center, i, j, dim));
+                c = atomicAdd(countDistances, 1);
+                if (c == 18446744073709551615) {
+                    printf("OVERFLOW");
+                }
                 if (curDistance < closestDistance) {
                     closestDistance = curDistance;
                     closest2[i] = j;
@@ -1180,8 +1264,118 @@ __global__ void elkanFunMOHam(double* data, double* center, unsigned short* assi
     }
 }
 
+__global__ void elkanFunMOShared(double* data, double* center, unsigned short* assignment, double* upper,
+    double* s, double* centerCenterDistDiv2, double* oldcenter2newcenterDis, double* oldcenterCenterDistDiv2, double* ub_old, double* centerMovement, int k, int dim, int n, unsigned short* closest2, unsigned long long int* countDistances) {
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    const int blockSize = 4 * 32;
+
+    __shared__ int counter;
+    __shared__ int calculate[blockSize];
+
+    counter = 0;
+    calculate[threadIdx.x] = -1;
+    __syncthreads();
+
+    int index;
+
+    if (i < n) {
+        closest2[i] = assignment[i];
+        if (upper[i] >= s[closest2[i]]) {
+            index = atomicAdd(&counter, 1);
+            calculate[index] = i;
+        }
+
+    }
+    __syncthreads();
+
+    if (i < n) {
+        closest2[calculate[threadIdx.x]] = assignment[calculate[threadIdx.x]];
+        bool r = true;
+
+        if (calculate[threadIdx.x] >= 0) {
+            for (int j = 0; j < k; ++j) {
+                if (j == closest2[calculate[threadIdx.x]]) { continue; }
+                if (upper[calculate[threadIdx.x]] <= 2.0 * (oldcenterCenterDistDiv2[assignment[calculate[threadIdx.x]] * k + j]) - ub_old[calculate[threadIdx.x]] - centerMovement[j]) { continue; }
+                if (upper[calculate[threadIdx.x]] <= oldcenter2newcenterDis[assignment[calculate[threadIdx.x]] * k + j] - ub_old[calculate[threadIdx.x]]) { continue; }
+                if (upper[calculate[threadIdx.x]] <= centerCenterDistDiv2[closest2[calculate[threadIdx.x]] * k + j]) { continue; }
+
+                // ELKAN 3(a)
+                if (r) {
+                    upper[calculate[threadIdx.x]] = sqrt(dist22(data, center, calculate[threadIdx.x], closest2[calculate[threadIdx.x]], dim));
+                    //lower[calculate[threadIdx.x] * k + closest2[calculate[threadIdx.x]]] = upper[calculate[threadIdx.x]];
+                    r = false;
+                    if ((upper[calculate[threadIdx.x]] <= 2.0 * (oldcenterCenterDistDiv2[assignment[calculate[threadIdx.x]] * k + j]) - ub_old[calculate[threadIdx.x]] - centerMovement[j])
+                        || (upper[calculate[threadIdx.x]] <= centerCenterDistDiv2[closest2[calculate[threadIdx.x]] * k + j])) {
+                        continue;
+                    }
+                }
+
+                // ELKAN 3(b)
+                double dist = sqrt(dist22(data, center, calculate[threadIdx.x], j, dim));
+                if (dist < upper[calculate[threadIdx.x]]) {
+                    closest2[calculate[threadIdx.x]] = j;
+                    upper[calculate[threadIdx.x]] = dist;
+                }
+            }
+        }
+    }
+}
+
+//    if (i < n) {
+//        //unsigned short closest = assignment[i];
+//        closest2[i] = assignment[i];
+//        double localUpper = upper[i];
+//        bool r = true;
+//        unsigned long long int c;
+//
+//        if (localUpper > s[closest2[i]]) {
+//            //upper[i] = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+//            for (int j = 0; j < k; ++j) {
+//                if (j == closest2[i]) { continue; }
+//                if (localUpper <= 2.0 * (oldcenterCenterDistDiv2[assignment[i] * k + j]) - ub_old[i] - centerMovement[j]) { continue; }
+//                if (localUpper <= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i]) { continue; }  //upper[i] <= lower[i * k + j] ||
+//                if (localUpper <= centerCenterDistDiv2[closest2[i] * k + j]) { continue; }
+//
+//                // ELKAN 3(a)
+//                if (r) {
+//                    //localUpper = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+//                    localUpper = sqrt(dist22(data, center, i, closest2[i], dim));
+//#if DISTANCES
+//                    c = atomicAdd(countDistances, 1);
+//                    if (c == 18446744073709551615) {
+//                        printf("OVERFLOW");
+//                    }
+//#endif
+//                    r = false;
+//                    if ((localUpper <= 2.0 * (oldcenterCenterDistDiv2[assignment[i] * k + j]) - ub_old[i] - centerMovement[j]) || (localUpper <= centerCenterDistDiv2[closest2[i] * k + j])) {
+//                        continue;
+//                    }
+//                }
+//
+//                // ELKAN 3(b)
+//                //lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
+//                //double inner2 = sqrt(innerProdp2c(data, center, i, j, dim));
+//                double inner = sqrt(dist22(data, center, i, j, dim));
+//#if DISTANCES
+//                c = atomicAdd(countDistances, 1);
+//                if (c == 18446744073709551615) {
+//                    printf("OVERFLOW");
+//                }
+//#endif
+//                if (inner < localUpper) {
+//                    closest2[i] = j;
+//                    localUpper = inner;
+//                }
+//            }
+//        }
+//        upper[i] = localUpper;
+//    }
+//}
+
 __global__ void elkanFunMO(double* data, double* center, unsigned short* assignment, double* upper,
-    double* s, double* centerCenterDistDiv2, double* oldcenter2newcenterDis, double* oldcenterCenterDistDiv2, double* ub_old, double* centerMovement, int k, int dim, int n, unsigned short* closest2) {
+    double* s, double* centerCenterDistDiv2, double* oldcenter2newcenterDis, double* oldcenterCenterDistDiv2, double* ub_old, double* centerMovement, int k, int dim, int n, unsigned short* closest2, unsigned long long int* countDistances) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
@@ -1189,6 +1383,7 @@ __global__ void elkanFunMO(double* data, double* center, unsigned short* assignm
         closest2[i] = assignment[i];
         double localUpper = upper[i];
         bool r = true;
+        unsigned long long int c;
         
         if (localUpper > s[closest2[i]]) {
             //upper[i] = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
@@ -1200,7 +1395,14 @@ __global__ void elkanFunMO(double* data, double* center, unsigned short* assignm
 
                 // ELKAN 3(a)
                 if (r) {
-                    localUpper = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+                    //localUpper = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+                    localUpper = sqrt(dist22(data, center, i, closest2[i], dim));
+#if DISTANCES
+                    c = atomicAdd(countDistances, 1);
+                    if (c == 18446744073709551615) {
+                        printf("OVERFLOW");
+                    }
+#endif
                     r = false;
                     if ((localUpper <= 2.0 * (oldcenterCenterDistDiv2[assignment[i] * k + j]) - ub_old[i] - centerMovement[j]) || (localUpper <= centerCenterDistDiv2[closest2[i] * k + j])) {
                         continue;
@@ -1209,7 +1411,14 @@ __global__ void elkanFunMO(double* data, double* center, unsigned short* assignm
 
                 // ELKAN 3(b)
                 //lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
-                double inner = sqrt(innerProdp2c(data, center, i, j, dim));
+                //double inner2 = sqrt(innerProdp2c(data, center, i, j, dim));
+                double inner = sqrt(dist22(data, center, i, j, dim));
+#if DISTANCES
+                c = atomicAdd(countDistances, 1);
+                if (c == 18446744073709551615) {
+                    printf("OVERFLOW");
+                }
+#endif
                 if (inner < localUpper) {
                     closest2[i] = j;
                     localUpper = inner;
@@ -1517,17 +1726,24 @@ __global__ void elkanFunHamPRINT(double* data, double* center, unsigned short* a
 }
 
 __global__ void elkanFunHam(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2) {
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, unsigned long long int* countDistances) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (i < n) {
         closest2[i] = assignment[i];
+        unsigned long long int c;
         if (upper[i] >= s[closest2[i]] && upper[i] >= lower[i]) {
             double closestDistance = INFINITY;
             double secondClosestDist = INFINITY;
 
             for (int j = 0; j < k; ++j) {    
-                double curDistance = sqrt(innerProdp2c(data, center, i, j, dim));
+                double curDistance = sqrt(dist22(data, center, i, j, dim));
+#if DISTANCES
+                c = atomicAdd(countDistances, 1);
+                if (c == 18446744073709551615) {
+                    printf("OVERFLOW");
+                }
+#endif
                 if (curDistance < closestDistance) {
                     secondClosestDist = closestDistance;                    
                     closestDistance = curDistance;
@@ -1542,6 +1758,169 @@ __global__ void elkanFunHam(double* data, double* center, unsigned short* assign
         }
     }
 }
+
+__global__ void elkanFunHamSharedDaFuck(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2) {
+
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    const int blockSize = 3 * 32;
+
+    //__shared__ int counter;
+    //__shared__ int calculate[blockSize];
+    int calc = -1;
+    //counter = 0;
+    //calculate[threadIdx.x] = -1;
+    __syncthreads();
+
+    //__shared__ double sharedData[blockSize * dimension];
+
+    int index;
+
+    if (i < n) {
+        closest2[i] = assignment[i];
+        if (upper[i] >= s[closest2[i]] && upper[i] >= lower[i]) {
+            //index = atomicAdd(&counter, 1);
+            //for (int j = 0; j < dim; j++) {
+            //    sharedData[index * dim + j] = data[i * dim + j];                
+            //}
+            //calculate[threadIdx.x] = i;
+            calc = i;
+        }
+
+    }
+    __syncthreads();
+
+    if (i < n) {
+
+        if (calc >= 0) {
+            double closestDistance = INFINITY;
+            double secondClosestDist = INFINITY;
+
+            for (int j = 0; j < k; ++j) {
+                double curDistance = sqrt(innerProdp2c(data, center, calc, j, dim));
+                if (curDistance < closestDistance) {
+                    secondClosestDist = closestDistance;
+                    closestDistance = curDistance;
+                    closest2[calc] = j;
+                }
+                else if (curDistance < secondClosestDist) {
+                    secondClosestDist = curDistance;
+                }
+            }
+            upper[calc] = closestDistance;
+            lower[calc] = secondClosestDist;
+        }
+    }
+}
+
+__global__ void elkanFunHamShared(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    const int blockSize = 3 * 32;
+
+    __shared__ int counter;
+    __shared__ int calculate[blockSize];
+
+    counter = 0;
+    calculate[threadIdx.x] = -1;
+    __syncthreads();
+
+    //__shared__ double sharedData[blockSize * dimension];
+
+    int index;
+
+    if (i < n) {
+        closest2[i] = assignment[i];
+        if (upper[i] >= s[closest2[i]] && upper[i] >= lower[i]) {
+            index = atomicAdd(&counter, 1);
+            //for (int j = 0; j < dim; j++) {
+            //    sharedData[index * dim + j] = data[i * dim + j];                
+            //}
+            calculate[index] = i;
+        }
+
+    }
+    __syncthreads();
+
+    //calculate[threadIdx.x]--;
+
+    if (i < n) {
+        
+        if (calculate[threadIdx.x]>=0) {
+            double closestDistance = INFINITY;
+            double secondClosestDist = INFINITY;
+
+            for (int j = 0; j < k; ++j) {
+                double curDistance = sqrt(dist22(data, center, calculate[threadIdx.x], j, dim));
+                if (curDistance < closestDistance) {
+                    secondClosestDist = closestDistance;
+                    closestDistance = curDistance;
+                    closest2[calculate[threadIdx.x]] = j;
+                }
+                else if (curDistance < secondClosestDist) {
+                    secondClosestDist = curDistance;
+                }
+            }
+            upper[calculate[threadIdx.x]] = closestDistance;
+            lower[calculate[threadIdx.x]] = secondClosestDist;
+        }
+    }
+}
+
+//__global__ void elkanFunHamSharedK(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+//    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2) {
+//    int i = blockIdx.x * blockDim.x + threadIdx.x;
+//    int point = threadIdx.x / k;
+//    int cluster = threadIdx.x % k;
+//    const int blockSize = 3 * 32;
+//
+//    __shared__ int counter;
+//    __shared__ int calculate[blockSize];
+//
+//    counter = 0;
+//    calculate[point] = -1;
+//    __syncthreads();
+//
+//    //__shared__ double sharedData[blockSize * dimension];
+//
+//    int index;
+//
+//    if (i < n && cluster==0) {
+//        closest2[i] = assignment[i];
+//        if (upper[i] >= s[closest2[i]] && upper[i] >= lower[i]) {
+//            index = atomicAdd(&counter, 1);
+//            //for (int j = 0; j < dim; j++) {
+//            //    sharedData[index * dim + j] = data[i * dim + j];                
+//            //}
+//            calculate[index] = i;
+//        }
+//
+//    }
+//    __syncthreads();
+//
+//    //calculate[threadIdx.x]--;
+//
+//    if (i < n) {
+//        if (calculate[point] >= 0) {
+//            double closestDistance = INFINITY;
+//            double secondClosestDist = INFINITY;
+//
+//                lower[] = sqrt(dist22(data, center, calculate[point], cluster, dim));
+//                if (curDistance < closestDistance) {
+//                    secondClosestDist = closestDistance;
+//                    closestDistance = curDistance;
+//                    closest2[calculate[threadIdx.x]] = cluster;
+//                }
+//                else if (curDistance < secondClosestDist) {
+//                    secondClosestDist = curDistance;
+//                }
+//            
+//            upper[calculate[threadIdx.x]] = closestDistance;
+//            lower[calculate[threadIdx.x]] = secondClosestDist;
+//        }
+//    }
+//}
+
 
 __global__ void elkanFunHamFewerRules(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
     double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2) {
@@ -1570,17 +1949,186 @@ __global__ void elkanFunHamFewerRules(double* data, double* center, unsigned sho
     }
 }
 
+__global__ void elkanFunNoMoveKcombine(double* lower, double* upper,int k, int n, unsigned short* closest2, bool* calculated, double* dist) {
 
-__global__ void elkanFunNoMove(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        for (int j = 0; j < k; j++) {
+            if (calculated[i+k+j]) {
+                lower[i * k + j] = dist[i * k + j];
+                if (lower[i * k + j] < upper[i]) {
+                    closest2[i] = j;
+                    upper[i] = lower[i * k + j];
+                }
+            }
+        }
+    }
+    
+}
+
+__global__ void elkanFunNoMoveK(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int offset, bool* calculated, double* dist) {
+
+    int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
+    int c1 = i / k;
+    int j = i % k;
+
+    if (i < n) {
+        closest2[c1] = assignment[c1];
+        double localUpper = upper[c1];
+        //upper[i] > s[closest2[i]] && upper[i] >= lower[i * k + j] && upper[i] >= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i];
+        calculated[c1 * k + j] = localUpper > s[closest2[c1]] && localUpper >= lower[c1 * k + j];
+
+       /* if (localUpper > s[closest2[c1]]) {
+            if (j == closest2[c1]) { return; }
+            if (localUpper <= lower[c1 * k + j]) { return; }
+            if (localUpper <= centerCenterDistDiv2[closest2[c1] * k + j]) { return; }*/
+        if (calculated[c1 * k + j]){
+            dist[c1 * k + j] = sqrt(dist22(data, center, c1, j, dim));           
+        }
+    }
+}
+
+__global__ void elkanFunNoMoveKKcombine(double* lower, double* upper, int k, int n, unsigned short* closest2, bool* calculated) {
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        for (int j = 0; j < k; j++) {
+            if (lower[i * k + j] < upper[i]) {
+                closest2[i] = j;
+                upper[i] = lower[i * k + j];
+            }
+            
+        }
+    }
+ }
+
+__global__ void elkanFunNoMoveKK(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
     double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int offset) {
 
     int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
+    int c1 = i / k;
+    int j = i % k;
+
+    if (c1 < n) {
+        closest2[c1] = assignment[c1];
+        //double localUpper = ;
+
+        if (upper[c1] > s[closest2[c1]]) {
+            //if (j == closest2[c1]) { return; }
+            if (upper[c1] <= lower[c1 * k + j]) { return; }
+            if (upper[c1] <= centerCenterDistDiv2[closest2[c1] * k + j]) { return; }
+
+            lower[c1 * k + j] = sqrt(dist22(data, center, c1, j, dim));
+        }
+    }
+}
+
+__global__ void elkanFunNoMoveShared(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int offset) {
+
+    int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
+    const int blockSize = 4 * 32;
+
+    __shared__ int counter;
+    __shared__ int calculate[blockSize];
+
+    counter = 0;
+    calculate[threadIdx.x] = -1;
+    __syncthreads();
+
+    //__shared__ double sharedData[blockSize * dimension];
+
+    int index;
 
     if (i < n) {
         closest2[i] = assignment[i];
+        if (upper[i] >= s[closest2[i]]) {
+            index = atomicAdd(&counter, 1);
+            calculate[index] = i;
+        }
+
+    }
+    __syncthreads();
+
+    if (i < n) {
+        closest2[calculate[threadIdx.x]] = assignment[calculate[threadIdx.x]];
+        bool r = true;
+
+        if (calculate[threadIdx.x]>=0) {
+                for (int j = 0; j < k; ++j) {
+                    if (j == closest2[calculate[threadIdx.x]]) { continue; }
+                    if (upper[calculate[threadIdx.x]] <= lower[calculate[threadIdx.x] * k + j]) { continue; }
+                    if (upper[calculate[threadIdx.x]] <= centerCenterDistDiv2[closest2[calculate[threadIdx.x]] * k + j]) { continue; }
+                    if (r) {
+                        upper[calculate[threadIdx.x]] = sqrt(dist22(data, center, calculate[threadIdx.x], closest2[calculate[threadIdx.x]], dim));
+
+                        lower[calculate[threadIdx.x] * k + closest2[calculate[threadIdx.x]]] = upper[calculate[threadIdx.x]];
+                        r = false;
+                        if ((upper[calculate[threadIdx.x]] <= lower[calculate[threadIdx.x] * k + j]) || (upper[calculate[threadIdx.x]] <= centerCenterDistDiv2[closest2[calculate[threadIdx.x]] * k + j])) {
+                            continue;
+                        }
+                    }
+                    lower[calculate[threadIdx.x] * k + j] = sqrt(dist22(data, center, calculate[threadIdx.x], j, dim));
+                    if (lower[calculate[threadIdx.x] * k + j] < upper[calculate[threadIdx.x]]) {
+                        closest2[calculate[threadIdx.x]] = j;
+                        upper[calculate[threadIdx.x]] = lower[calculate[threadIdx.x] * k + j];
+                    }
+                }                             
+        }
+    }
+}
+
+////without shared
+//int i = blockIdx.x * blockDim.x + threadIdx.x;
+//if (i < n) {
+//    if (upper[i] > s[closest2[i]]){
+//        ...
+//
+////with shared
+//int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
+//const int blockSize = 5 * 32;
+//
+//__shared__ int counter;
+//__shared__ int calculate[blockSize];
+//
+//counter = 0;
+//calculate[threadIdx.x] = -1;
+//__syncthreads();
+//
+//int index;
+//if (i < n) {
+//    closest2[i] = assignment[i];
+//    if (upper[i] >= s[closest2[i]]) {
+//        index = atomicAdd(&counter, 1);
+//        calculate[index] = i;
+//    }
+//
+//}
+//__syncthreads();        
+//if (i < n) {
+//    //use calculate[threadIdx.x] instead of i after this
+//    closest2[calculate[threadIdx.x]] = assignment[calculate[threadIdx.x]];
+//    bool r = true;
+//    if (calculate[threadIdx.x] >= 0) {
+//        ...
+
+
+__global__ void elkanFunNoMove(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int offset, unsigned long long int* countDistances) {
+
+    int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
+   /* if (i == 0)
+        printf("Closestt start\n");*/
+    if (i < n) {
+        closest2[i] = assignment[i];
+        /*if (i == 0)
+            printf("Closestt bevor i=0:  %i\n", closest2[i]);*/
         bool r = true;
         double localUpper = upper[i];
-
+        unsigned long long int c;
         if (localUpper > s[closest2[i]]) {
             for (int j = 0; j < k; ++j) {
                 if (j == closest2[i]) { continue; }
@@ -1589,7 +2137,14 @@ __global__ void elkanFunNoMove(double* data, double* center, unsigned short* ass
 
                 // ELKAN 3(a)
                 if (r) {
-                    localUpper = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+                    //localUpper = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+                    localUpper = sqrt(dist22(data, center, i, closest2[i], dim));
+#if DISTANCES
+                    c = atomicAdd(countDistances, 1);
+                    if (c == 18446744073709551615) {
+                        printf("OVERFLOW");
+                    }
+#endif
                     /* for (int j = 0; j < dim; j++) {
                          lastExactCentroid[i * dim + j] = center[assignment[i] * dim + j];
                      }*/
@@ -1601,9 +2156,20 @@ __global__ void elkanFunNoMove(double* data, double* center, unsigned short* ass
                 }
 
                 // ELKAN 3(b)
-                lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
+                //lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
+                lower[i * k + j] = sqrt(dist22(data, center, i, j, dim));
+#if DISTANCES
+                c = atomicAdd(countDistances, 1);
+                if (c == 18446744073709551615) {
+                    printf("OVERFLOW");
+                }
+#endif
+               /* if (i == 0)
+                    printf("Closest i=0:  %i\n", closest2[i]);*/
                 if (lower[i * k + j] < localUpper){
                     closest2[i] = j;
+                   /* if (i == 0)
+                        printf("Closestt i=0:  %i\n", closest2[i]);*/
                     localUpper = lower[i * k + j];
                     /*   for (int j = 0; j < dim; j++) {
                            lastExactCentroid[i * dim + j] = center[assignment[i] * dim + j];
@@ -1662,9 +2228,9 @@ __global__ void elkanFunNoMoveAfterCheck(double* data, double* center, unsigned 
 }
 
 __global__ void elkanFunNoMoveFewer(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int* clusterSize, double* sumNewCenters, int offset) {
+    double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, int offset) {
 
-    int i = offset + blockIdx.x * blockDim.x + threadIdx.x;
+    int i =  blockIdx.x * blockDim.x + threadIdx.x;
 
     if (i < n) {
         closest2[i] = assignment[i];
@@ -1674,7 +2240,7 @@ __global__ void elkanFunNoMoveFewer(double* data, double* center, unsigned short
                 if (j == closest2[i]) { continue; }
                 if (upper[i] <= lower[i * k + j]) { continue; }
                
-                upper[i] = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+                //upper[i] = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
                 lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
 
                 if (lower[i * k + j] < upper[i]) {
@@ -1762,8 +2328,27 @@ __global__ void elkanFunFBTest(double* data, double* center, unsigned short* ass
     }
 }
 
-__global__ void elkanFunFBHamTTLoop(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2, bool* calculated, double* distances) {
+__global__ void elkanFunMOHamTTLoop(double* upper,
+    int k, int n, unsigned short* closest2, bool* calculated, double* distances) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        double closestDistance = INFINITY;
+        for (int j = 0; j < k; ++j) {            
+            if (calculated[i * k + j]) {
+                if (distances[i * k + j] < closestDistance) {
+                    closestDistance = distances[i * k + j];
+                    closest2[i] = j;
+                }
+            }
+                      
+        }
+        upper[i] = closestDistance;
+    }
+}
+
+__global__ void elkanFunFBHamTTLoop(double* lower, double* upper,
+    int k, int n, unsigned short* closest2, bool* calculated, double* distances) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
@@ -1771,7 +2356,7 @@ __global__ void elkanFunFBHamTTLoop(double* data, double* center, unsigned short
         //double curDistance;
         for (int j = 0; j < k; ++j) {
             if (calculated[i * k + j]) {
-                lower[i * k + j] = distances[i * k + j];
+                //lower[i * k + j] = distances[i * k + j];
                 //lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
                 if (lower[i * k + j] < upper[i]) {
                     closest2[i] = j;
@@ -1784,10 +2369,13 @@ __global__ void elkanFunFBHamTTLoop(double* data, double* center, unsigned short
 
 __global__ void elkanFunFBHamTT(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
     double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2, bool* calculated, double* distances) {
+   /* __global__ void elkanFunFBHamTT(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+        double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, bool* calculated, double* distances) {*/
+//__global__ void elkanFunFBHamTT(double* lower, double* upper, int k, int n, unsigned short* closest2, bool* calculated, double* distances) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
-        closest2[i] = assignment[i];
+        //closest2[i] = assignment[i];
         if (calculated[i]) {
             double closestDistance = INFINITY;
             double secondClosestDist = INFINITY;
@@ -1813,12 +2401,28 @@ __global__ void elkanFunFBHamTT(double* data, double* center, unsigned short* as
     }
 }
 
+__global__ void elkanFunFBHamK(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2, double*distances, bool*calculated) {
+   /* __global__ void elkanFunFBHamK(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+        double* s, double* centerCenterDistDiv2, int k, int dim, int n, unsigned short* closest2, double* distances, bool* calculated) {*/
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int c1 = i / k;
+    int c2 = i % k;
+
+    if (c1 < n) {
+        calculated[c1] = upper[c1] > s[assignment[c1]] && upper[c1] >= lower[c1]; //&& upper[c1] >= maxoldcenter2newcenterDis[assignment[c1]] - ub_old[c1];    
+        if (calculated[c1])
+            distances[i] = sqrt(dist22(data, center, c1, c2, dim));
+    }
+}
+
 __global__ void elkanFunFBHam(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2) {
+    double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2, unsigned long long int* countDistances) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
         closest2[i] = assignment[i];
+        unsigned long long int c;
         if (upper[i] > s[closest2[i]] && upper[i] >= lower[i] && upper[i] >= maxoldcenter2newcenterDis[assignment[i]] - ub_old[i]) {
         //if (upper[i] > s[closest2[i]]) {
         //if (upper[i] > s[closest2[i]] && upper[i] >= lower[i]) {
@@ -1826,7 +2430,11 @@ __global__ void elkanFunFBHam(double* data, double* center, unsigned short* assi
             double secondClosestDist = INFINITY;
 
             for (int j = 0; j < k; ++j) {
-                double curDistance = sqrt(innerProdp2c(data, center, i, j, dim));
+                double curDistance = sqrt(dist22(data, center, i, j, dim));
+                c = atomicAdd(countDistances, 1);
+                if (c == 18446744073709551615) {
+                    printf("OVERFLOW");
+                }
                 if (curDistance < closestDistance) {
                     secondClosestDist = closestDistance;
                     closestDistance = curDistance;
@@ -1842,18 +2450,86 @@ __global__ void elkanFunFBHam(double* data, double* center, unsigned short* assi
     }    
 }
 
-__global__ void elkanFunLloyd(double* data, double* center, unsigned short* assignment, int k, int dim, int n, unsigned short* closest2) {
+__global__ void elkanFunFBHamShared(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, double* maxoldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2) {
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    const int blockSize = 20 * 32;
+
+    __shared__ int counter;
+    __shared__ int calculate[blockSize];
+
+    counter = 0;
+    calculate[threadIdx.x] = -1;
+    __syncthreads();
+
+    //__shared__ double sharedData[blockSize * dimension];
+
+    int index;
+
+    if (i < n) {
+        closest2[i] = assignment[i];
+        if (upper[i] > s[closest2[i]] && upper[i] >= lower[i] && upper[i] >= maxoldcenter2newcenterDis[assignment[i]] - ub_old[i]) {
+            index = atomicAdd(&counter, 1);
+            //for (int j = 0; j < dim; j++) {
+            //    sharedData[index * dim + j] = data[i * dim + j];                
+            //}
+            calculate[index] = i;
+        }
+
+    }
+    __syncthreads();
+
+    //calculate[threadIdx.x]--;
+
+    if (i < n) {
+        if (calculate[threadIdx.x] >= 0) {
+            double closestDistance = INFINITY;
+            double secondClosestDist = INFINITY;
+
+            for (int j = 0; j < k; ++j) {
+                double curDistance = sqrt(dist22(data, center, calculate[threadIdx.x], j, dim));
+                
+                if (curDistance < closestDistance) {
+                    secondClosestDist = closestDistance;
+                    closestDistance = curDistance;
+                    closest2[calculate[threadIdx.x]] = j;
+                }
+                else if (curDistance < secondClosestDist) {
+                    secondClosestDist = curDistance;
+                }
+            }
+            upper[calculate[threadIdx.x]] = closestDistance;
+            lower[calculate[threadIdx.x]] = secondClosestDist;
+        }
+    }
+}
+
+__global__ void elkanFunLloyd(double* data, double* center, unsigned short* assignment, int k, int dim, int n, unsigned short* closest2, unsigned long long int* countDistances) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
         closest2[i] = assignment[i];
         double closestDistance = INFINITY;
         for (int j = 0; j < k; ++j) {            
-            double curDistance = sqrt(innerProdp2c(data, center, i, j, dim));
+            double curDistance = sqrt(dist22(data, center, i, j, dim));
+           // atomicAdd(countDistances, 1);
             if (curDistance < closestDistance) {
                 closestDistance = curDistance;
                 closest2[i] = j;
             }
         }        
+    }
+}
+
+__global__ void calculateFilterLoopMO(unsigned short* assignment, double* distances, double* upper,
+    double* s, double* oldcenter2newcenterDis, double* ub_old, bool* calculated, int n, int k, unsigned short* closest2, double* centerCenterDistDiv2, double* oldcenterCenterDistDiv2, double* centerMovement) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        closest2[i] = assignment[i];
+        for (int j = 0; j < k; j++) {
+            calculated[i * k + j] = upper[i] > s[closest2[i]] && upper[i] >= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i] && 2.0 * (oldcenterCenterDistDiv2[assignment[i] * k + j]) - ub_old[i] - centerMovement[j];
+        }
     }
 }
 
@@ -1866,8 +2542,37 @@ __global__ void calculateFilterLoop(unsigned short* assignment, double* lower, d
         closest2[i] = assignment[i]; 
         for (int j = 0; j < k; j++){
             //calculated[i*k+j] = upper[i] > s[closest2[i]] && upper[i] >= lower[i * k + j] && upper[i] >= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i] && upper[i] >= centerCenterDistDiv2[closest2[i] * k + j];
+            
+            //correct
             calculated[i * k + j] = upper[i] > s[closest2[i]] && upper[i] >= lower[i * k + j] && upper[i] >= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i];
+
+            //calculated[i * k + j] = upper[i] > s[closest2[i]] && upper[i] >= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i];
         }
+    }
+}
+
+__global__ void calculateFilterLoopE(unsigned short* assignment, double* lower, double* upper,
+    double* s, bool* calculated, int n, int k, unsigned short* closest2) {
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        closest2[i] = assignment[i];
+        for (int j = 0; j < k; j++) {
+            //calculated[i*k+j] = upper[i] > s[closest2[i]] && upper[i] >= lower[i * k + j] && upper[i] >= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i] && upper[i] >= centerCenterDistDiv2[closest2[i] * k + j];
+            calculated[i * k + j] = upper[i] > s[closest2[i]] && upper[i] >= lower[i * k + j];
+        }
+    }
+}
+
+__global__ void calculateFilterH(unsigned short* assignment, double* lower, double* upper,
+    double* s, bool* calculated, int n, unsigned short* closest2) {
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < n) {
+        closest2[i] = assignment[i];
+        calculated[i] = upper[i] > s[closest2[i]] && upper[i] >= lower[i];
     }
 }
 
@@ -1931,7 +2636,7 @@ __global__ void elkanFunFBHam2TT(double* data, double* center, double* distances
 
     if (c1 < n) {
         if (calculated[c1]) {
-            distances[i] = sqrt(innerProdp2c(data, center, c1, c2, dim));
+            //distances[i] = sqrt(innerProdp2c(data, center, c1, c2, dim));
             distances[i] = sqrt(dist22(data, center, c1, c2, dim));
         }
     }
@@ -1950,6 +2655,23 @@ __global__ void elkanFunFBHam2TTDouble(double* data, double* center, double* dis
     }
 }
 
+
+__global__ void elkanFunMOHam2TTLoop(double* data, double* center, double* distances, bool* calculated, int k, int dim, int n, unsigned short* assignment,
+        double* upper, double* s, double* centerCenterDistDiv2, double* oldcenter2newcenterDis, double* oldcenterCenterDistDiv2, double* ub_old, double* centerMovement, unsigned short* closest2) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int c1 = i / k;
+    int c2 = i % k;
+
+    if (c1 < n) {
+        closest2[i] = assignment[i];
+        calculated[c1 * k + c2] = upper[c1] > s[closest2[c1]] && upper[c1] >= distances[c1 * k + c2] && upper[c1] >= oldcenter2newcenterDis[assignment[c1] * k + c2] - ub_old[c1];
+        if (calculated[c1 * k + c2]) {
+            distances[c1 * k + c2] = sqrt(dist22(data, center, c1, c2, dim));
+            //lower[c1*k+c2] = sqrt(dist22(data, center, c1, c2, dim));
+        }
+    }
+}
+
 __global__ void elkanFunFBHam2TTLoop(double* data, double* center, double* distances, bool* calculated, int k, int dim, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int c1 = i / k;
@@ -1957,7 +2679,8 @@ __global__ void elkanFunFBHam2TTLoop(double* data, double* center, double* dista
 
     if (c1 < n) {
         if (calculated[c1 * k + c2]) {
-            distances[c1 * k + c2] = sqrt(innerProdp2c(data, center, c1, c2, dim));
+            distances[c1 * k + c2] = sqrt(dist22(data, center, c1, c2, dim));
+            //lower[c1*k+c2] = sqrt(dist22(data, center, c1, c2, dim));
         }
     }
 }
@@ -1989,14 +2712,13 @@ __global__ void elkanFunFBHamBounds(double* data, double* lower, double* upper,
 }
 
 __global__ void elkanFunFB(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
-    double* s, double* centerCenterDistDiv2, double* oldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2) {
+    double* s, double* centerCenterDistDiv2, double* oldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2, unsigned long long int* countDistances) {
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) {
-        //unsigned short closest = assignment[i];
         closest2[i] = assignment[i];
         bool r = true;
-
+        unsigned long long int c;
         if (upper[i] > s[closest2[i]]) {
             for (int j = 0; j < k; ++j) {
                 if (j == closest2[i]) { continue; }
@@ -2006,71 +2728,87 @@ __global__ void elkanFunFB(double* data, double* center, unsigned short* assignm
 
                 // ELKAN 3(a)
                 if (r) {
-                    //upper[i] = sqrt(pointCenterDist2(i, closest));
-                    upper[i] = sqrt(innerProdp2c(data, center, i, closest2[i], dim));
+                    upper[i] = sqrt(dist22(data, center, i, closest2[i], dim));
+#if DISTANCES
+                    c = atomicAdd(countDistances, 1);
+                    if (c == 18446744073709551615) {
+                        printf("OVERFLOW");
+                    }
+#endif
                     lower[i * k + closest2[i]] = upper[i];
                     r = false;
-                    //if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest2[i] * k + j]) || upper[i] <= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i]) {
-                    //    //if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest2[i] * k + j])) {
-                    //    continue;
-                    //}
+                    if ((upper[i] <= lower[i * k + j]) || (upper[i] <= centerCenterDistDiv2[closest2[i] * k + j]) || upper[i] <= oldcenter2newcenterDis[assignment[i] * k + j] - ub_old[i]) {
+                        continue;
+                    }
                 }
 
                 // ELKAN 3(b)
-                //lower[i * k + j] = sqrt(pointCenterDist2(i, j));
-                lower[i * k + j] = sqrt(innerProdp2c(data, center, i, j, dim));
+                lower[i * k + j] = sqrt(dist22(data, center, i, j, dim));
+#if DISTANCES
+                c = atomicAdd(countDistances, 1);
+                if (c == 18446744073709551615) {
+                    printf("OVERFLOW");
+                }
+#endif
                 if (lower[i * k + j] < upper[i]) {
                     closest2[i] = j;
                     upper[i] = lower[i * k + j];
                 }
             }
+        }      
+    }
+}
+
+__global__ void elkanFunFBShared(double* data, double* center, unsigned short* assignment, double* lower, double* upper,
+    double* s, double* centerCenterDistDiv2, double* oldcenter2newcenterDis, double* ub_old, int k, int dim, int n, unsigned short* closest2) {
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    const int blockSize = 4 * 32;
+
+    __shared__ int counter;
+    __shared__ int calculate[blockSize];
+
+    counter = 0;
+    calculate[threadIdx.x] = -1;
+    __syncthreads();
+
+    int index;
+
+    if (i < n) {
+        closest2[i] = assignment[i];
+        if (upper[i] >= s[closest2[i]]) {
+            index = atomicAdd(&counter, 1);
+            calculate[index] = i;
         }
 
-        /*int furthestMovingCenter = 0;
-        for (int j = 0; j < k; ++j) {
-            centerMovement[j] = 0.0;
-            int totalClusterSize = 0;
-            double old = 0;
-            totalClusterSize += clusterSize[0][j];
+    }
+    __syncthreads();
 
-            if (totalClusterSize > 0) {
-                for (int d = 0; d < dim; ++d) {
-                    double z = 0.0;
-                    //z += (*sumNewCenters[0])(j, d);
-                    z += sumNewCenters[j * dim + d];
-                    z /= totalClusterSize;
-                    //centerMovement[j] += (z - (*centers)(j, d)) * (z - (*centers)(j, d));//calculate distance
-                    centerMovement[j] += (z - center[j * dim + d]) * (z - center[j * dim + d]);
-                    //(*centers)(j, dim) = z; //update new centers
-                    oldcenters[j * d + dim] = center[j * dim + d];
-                    center[j * dim + d] = z;
-                }
-            }
-            centerMovement[j] = sqrt(centerMovement[j]);
+    if (i < n) {
+        closest2[calculate[threadIdx.x]] = assignment[calculate[threadIdx.x]];
+        bool r = true;
 
-            if (centerMovement[furthestMovingCenter] < centerMovement[j]) {
-                furthestMovingCenter = j;
-            }
-        }
-        for (int c1 = 0; c1 < k; ++c1) {
-            for (int c2 = 0; c2 < k; ++c2)
-                if (c1 != c2) {
-                    oldcenter2newcenterDis[c1 * k + c2] = 0.0;
-                    for (int d = 0; d < dim; ++d) {
-                        oldcenter2newcenterDis[c1 * k + c2] += (oldcenters[c1 * dim + d] - center[c2 * dim + d]) * (oldcenters[c1 * dim + d] - center[c2 * dim + d]);
-                    }
-                    oldcenter2newcenterDis[c1 * k + c2] = sqrt(oldcenter2newcenterDis[c1 * k + c2]);
-                }
-        }
-
-        *converged = (0.0 == centerMovement[furthestMovingCenter]);
-        if (!(*converged)) {
-            ub_old[i] = upper[i];
-            upper[i] += centerMovement[assignment[i]];
+        if (calculate[threadIdx.x]>=0) {
             for (int j = 0; j < k; ++j) {
-                lower[i * numLowerBounds + j] -= centerMovement[j];
-            }
-        }*/
+                if (j == closest2[calculate[threadIdx.x]]) { continue; }
+                if (upper[calculate[threadIdx.x]] <= lower[calculate[threadIdx.x] * k + j]) { continue; }
+                if (upper[calculate[threadIdx.x]] <= oldcenter2newcenterDis[assignment[calculate[threadIdx.x]] * k + j] - ub_old[calculate[threadIdx.x]]) { continue; }
+                if (upper[calculate[threadIdx.x]] <= centerCenterDistDiv2[closest2[calculate[threadIdx.x]] * k + j]) { continue; }
 
+                // ELKAN 3(a)
+                if (r) {
+                    upper[calculate[threadIdx.x]] = sqrt(dist22(data, center, calculate[threadIdx.x], closest2[calculate[threadIdx.x]], dim));
+                    lower[calculate[threadIdx.x] * k + closest2[calculate[threadIdx.x]]] = upper[calculate[threadIdx.x]];
+                    r = false;
+                }
+
+                // ELKAN 3(b)
+                lower[calculate[threadIdx.x] * k + j] = sqrt(dist22(data, center, calculate[threadIdx.x], j, dim));
+                if (lower[calculate[threadIdx.x] * k + j] < upper[calculate[threadIdx.x]]) {
+                    closest2[calculate[threadIdx.x]] = j;
+                    upper[calculate[threadIdx.x]] = lower[calculate[threadIdx.x] * k + j];
+                }
+            }
+        }
     }
 }

@@ -71,6 +71,8 @@ void Kmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* in
     if (a != cudaSuccess) {
         std::cout << "cudaMalloc failed (centerMovement)" << std::endl;
     }
+    cudaMemset(d_centerMovement, 0, k * sizeof(double));
+
     clusterSize = new int* [numThreads];
     auto c = cudaMalloc(&d_clusterSize, k * sizeof(int));
     if (c != cudaSuccess) {

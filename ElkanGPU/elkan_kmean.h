@@ -36,6 +36,8 @@ protected:
     double* lower;
     double* d_centerCenterDistDiv2;
     double* d_lower;
+    bool* d_calculated;
+    double* d_dist;
 };
 
 #endif

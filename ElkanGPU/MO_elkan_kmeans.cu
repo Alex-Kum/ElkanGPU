@@ -6,16 +6,16 @@
 
 #include "MO_elkan_kmeans.h"
 #include "general_functions.h"
-//#include "gpufunctions.h"
+#include "gpufunctions.h"
 #include <cmath>
 #include <chrono>
  //using namespace std::chrono;
 
 #define Time 0
 #define Countdistance 0
-#define GPUA 0
-#define GPUB 0
-#define GPUC 0
+#define GPUA 1
+#define GPUB 1
+#define GPUC 1
 
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -31,7 +31,7 @@ inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort =
 void MO_ElkanKmeans::update_center_dists(int threadId) {
 #if GPUA
     const int n = centers->n * centers->n;
-    const int blockSize = 3 * 32;
+    const int blockSize = 1 * 32;
     const int numBlocks = (n + blockSize - 1) / blockSize;
 
     cudaMemset(d_s, std::numeric_limits<double>::max(), k * sizeof(double));
@@ -82,7 +82,7 @@ int MO_ElkanKmeans::runThread(int threadId, int maxIterations) {
     std::fill(ub_old, ub_old + n, std::numeric_limits<double>::max());
 
     oldcenterCenterDistDiv2 = new double[k * k];
-    cudaMalloc(&d_oldcenterCenterDistDiv2, (k*k) * sizeof(double));
+    cudaMalloc(&d_oldcenterCenterDistDiv2, (k * k) * sizeof(double));
     std::fill(oldcenterCenterDistDiv2, oldcenterCenterDistDiv2 + k * k, 0.0);
 
     oldcenter2newcenterDis = new double[k * k];
@@ -118,6 +118,16 @@ int MO_ElkanKmeans::runThread(int threadId, int maxIterations) {
     cudaMemcpy(d_oldcenter2newcenterDis, oldcenter2newcenterDis, (k * k) * sizeof(double), cudaMemcpyHostToDevice);
     gpuErrchk(cudaMemcpy(sumNewCenters[0]->d_data, sumNewCenters[0]->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(d_clusterSize, clusterSize[0], k * sizeof(int), cudaMemcpyHostToDevice));
+    bool* d_calculated;
+    double* d_distances;
+    cudaMalloc(&d_calculated, (n * k) * sizeof(bool));
+    cudaMalloc(&d_distances, (n * k) * sizeof(double));
+
+    unsigned long long int* d_countDistances;
+    cudaMalloc(&d_countDistances, 1 * sizeof(unsigned long long int));
+    cudaMemset(d_countDistances, 0, 1 * sizeof(unsigned long long int));
+    *convergedd = false;
+    converged = false;
 #endif
 
 #if GPUC
@@ -131,11 +141,28 @@ int MO_ElkanKmeans::runThread(int threadId, int maxIterations) {
         update_center_dists(threadId);
 #if GPUC
         int nC = endNdx;
-        int blockSizeC = 3 * 32;
-        int numBlocksC = (nC + blockSizeC - 1) / blockSizeC;   
-        
-        elkanFunMO << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment, 
-            d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_oldcenterCenterDistDiv2, d_ub_old, d_centerMovement, k, d, endNdx, d_closest2);
+        int blockSizeC = 4 * 32;
+        int numBlocksC = (nC + blockSizeC - 1) / blockSizeC;
+
+        const int nD = endNdx * k;
+        const int blockSizeD = 4 * 32;
+        const int numBlocksD = (nD + blockSizeD - 1) / blockSizeD;
+
+        //k
+       
+        /*elkanFunMOHamKCalc << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, nC);
+        elkanFunMOHamBounds << <numBlocksD, blockSizeD >> > (d_upper, d_distances, d_calculated, k, d, n, d_closest2);*/
+
+        /*calculateFilterLoopMO << <numBlocksC, blockSizeC >> > (d_assignment, d_distances, d_upper, d_s, d_oldcenter2newcenterDis, d_ub_old, 
+            d_calculated, nC, k, d_closest2, d_centerCenterDistDiv2, d_oldcenterCenterDistDiv2, d_centerMovement);
+        elkanFunFBHam2TTLoop << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, nC);
+        elkanFunMOHamTTLoop << <numBlocksC, blockSizeC >> > (d_upper, k, nC, d_closest2, d_calculated, d_distances); */   
+
+        /*elkanFunMOShared << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment,
+            d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_oldcenterCenterDistDiv2, d_ub_old, d_centerMovement, k, d, endNdx, d_closest2, d_countDistances);*/
+
+        elkanFunMO << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_assignment,
+            d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_oldcenterCenterDistDiv2, d_ub_old, d_centerMovement, k, d, endNdx, d_closest2, d_countDistances);
 
         changeAss << <numBlocksC, blockSizeC >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nC, 0);
 
@@ -235,21 +262,28 @@ int MO_ElkanKmeans::runThread(int threadId, int maxIterations) {
         }
         synchronizeAllThreads();
 
-    }
+        }
     cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
-    for (int i = 0; i < 20; i++) {
+    /*for (int i = 0; i < 20; i++) {
         std::cout << "assignment: " << assignment[i] << std::endl;
-    }
+    }*/
+#if DISTANCES
+    unsigned long long int cDist;
+    //cudaMemcpy(&cDist, d_countDistances, 1 * sizeof(unsigned long long int), cudaMemcpyDeviceToHost);
+    std::cout << "distance calculations: " << cDist << std::endl;
+#endif
+#if GPUC
     delete convergedd;
     cudaFree(d_converged);
+#endif
     std::cout << "ITERATIONEN: " << iterations << std::endl;
     return iterations;
-}
+    }
 
 void MO_ElkanKmeans::update_bounds(int startNdx, int endNdx) {
 #if GPUB
     int n = endNdx;
-    int blockSize = 3 * 32;
+    int blockSize = 1 * 32;
     int numBlocks = (n + blockSize - 1) / blockSize;
 
     updateBoundMO << <numBlocks, blockSize >> > (d_upper, d_ub_old, d_centerMovement, d_assignment, endNdx);
@@ -258,7 +292,7 @@ void MO_ElkanKmeans::update_bounds(int startNdx, int endNdx) {
     for (int i = startNdx; i < endNdx; ++i) {
         ub_old[i] = upper[i];
         upper[i] += centerMovement[assignment[i]];
-    }   
+    }
     for (int i = startNdx; i < endNdx; ++i) {
         upper[i] += centerMovement[assignment[i]];
     }
@@ -280,12 +314,12 @@ void MO_ElkanKmeans::free() {
     cudaFree(d_oldcenterCenterDistDiv2);
     cudaFree(d_oldcenter2newcenterDis);
     cudaFree(d_oldcenters);
-    
+
     delete centerCenterDistDiv2;
     centerCenterDistDiv2 = NULL;
     cudaFree(d_ub_old);
 
-    
+
     delete oldcenterCenterDistDiv2;
     delete oldcenter2newcenterDis;
     delete oldcenters;

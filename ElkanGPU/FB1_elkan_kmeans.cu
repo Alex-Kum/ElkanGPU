@@ -31,6 +31,7 @@ void FB1_ElkanKmeans::update_center_dists(int threadId) {
     const int numBlocks = (n + blockSize - 1) / blockSize;
 
    /* cudaMemcpy(centers->d_data, centers->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice);*/
+    cudaMemset(d_s, std::numeric_limits<double>::max(), k * sizeof(double));
     innerProd << <numBlocks, blockSize >> > (d_centerCenterDistDiv2, d_s, centers->d_data, centers->d, centers->n);
    /* cudaMemcpy(centers->data, centers->d_data, (k * d) * sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(centerCenterDistDiv2, d_centerCenterDistDiv2, (k * k) * sizeof(double), cudaMemcpyDeviceToHost);
@@ -97,12 +98,16 @@ int FB1_ElkanKmeans::runThread(int threadId, int maxIterations) {
     const int numBlocksC = (nC + blockSizeC - 1) / blockSizeC;
 
     const int nD = endNdx;
-    const int blockSizeD = 3 * 32;
+    const int blockSizeD = 4 * 32;
     const int numBlocksD = (nD + blockSizeD - 1) / blockSizeD;
 
     const int nM = centers->n;
     const int blockSizeM = 1 * 32;
     const int numBlocksM = (nM + blockSizeM - 1) / blockSizeM;
+
+    unsigned long long int* d_countDistances;
+    cudaMalloc(&d_countDistances, 1 * sizeof(unsigned long long int));
+    cudaMemset(d_countDistances, 0, 1 * sizeof(unsigned long long int));
 
 #endif
 #if GPUC
@@ -118,19 +123,25 @@ int FB1_ElkanKmeans::runThread(int threadId, int maxIterations) {
 
 #if GPUC  
         //elkanfunK
-       /* calculateFilterLoop << <numBlocksD, blockSizeD >> > (d_assignment, d_lower, d_upper, d_s, d_oldcenter2newcenterDis, d_ub_old, d_calculated, nD, k, d_closest2, d_centerCenterDistDiv2);
-        elkanFunFBHam2TTLoop << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k,d,nD);
-        elkanFunFBHamTTLoop << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
+        /*calculateFilterLoop << <numBlocksD, blockSizeD >> > (d_assignment, d_lower, d_upper, d_s, d_oldcenter2newcenterDis, d_ub_old, d_calculated, nD, k, d_closest2, d_centerCenterDistDiv2);
+        elkanFunFBHam2TTLoop << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_lower, d_calculated, k,d,nD);
+        elkanFunFBHamTTLoop << <numBlocksD, blockSizeD >> > (d_lower, d_upper, k, nD, d_closest2, d_calculated, d_distances);*/
+
+
+        /*elkanFunFBHamTTLoop << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
                 d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_ub_old, k, d, nD, d_closest2, d_calculated, d_distances);*/
 
 
-        //elkanFunFBHam2TTLoop << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, nD);
-        //elkanFunFBHamTTLoop << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
-        //    d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_ub_old, k, d, nD, d_closest2, d_calculated, d_distances);
+        /*elkanFunFBHam2TTLoop << <numBlocksC, blockSizeC >> > (x->d_data, centers->d_data, d_distances, d_calculated, k, d, nD);
+        elkanFunFBHamTTLoop << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
+            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_ub_old, k, d, nD, d_closest2, d_calculated, d_distances);*/
 
         //elkanfun
         elkanFunFB << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment, 
-            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2);
+            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2, d_countDistances);
+
+       /* elkanFunFBShared << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
+            d_lower, d_upper, d_s, d_centerCenterDistDiv2, d_oldcenter2newcenterDis, d_ub_old, k, d, endNdx, d_closest2);*/
         
         changeAss << <numBlocksD, blockSizeD >> > (x->d_data, d_assignment, d_closest2, d_clusterSize, sumNewCenters[threadId]->d_data, d, nD, 0);
 #else
@@ -203,11 +214,16 @@ int FB1_ElkanKmeans::runThread(int threadId, int maxIterations) {
             update_bounds(startNdx, endNdx);
         }
     }
-    cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
+    /*cudaMemcpy(assignment, d_assignment, n * sizeof(unsigned short), cudaMemcpyDeviceToHost);
     for (int i = 0; i < 20; i++) {
         std::cout << "assignment: " << assignment[i] << std::endl;
-    }
+    }*/
 
+#if DISTANCES
+    unsigned long long int cDist;
+    //cudaMemcpy(&cDist, d_countDistances, 1 * sizeof(unsigned long long int), cudaMemcpyDeviceToHost);
+    std::cout << "distance calculations: " << cDist << std::endl;
+#endif
     std::cout << "ITERATIONEN: " << iterations << std::endl;
     return iterations;
 }
@@ -215,7 +231,7 @@ int FB1_ElkanKmeans::runThread(int threadId, int maxIterations) {
 void FB1_ElkanKmeans::update_bounds(int startNdx, int endNdx) {
 #if GPUB
     int n = endNdx;
-    int blockSize = 3 * 32;
+    int blockSize = 1 * 32;
     int numBlocks = (n + blockSize - 1) / blockSize;
     
     /*cudaMemcpy(d_lower, lower, (n * k) * sizeof(double), cudaMemcpyHostToDevice);
@@ -225,6 +241,7 @@ void FB1_ElkanKmeans::update_bounds(int startNdx, int endNdx) {
     cudaMemcpy(d_centerMovement, centerMovement, k * sizeof(double), cudaMemcpyHostToDevice);*/
     
     updateBoundFB << <numBlocks, blockSize >> > (d_lower, d_upper, d_ub_old, d_centerMovement, d_assignment, numLowerBounds, k, endNdx); 
+    //updateBoundFBShared << <numBlocks, 258 >> > (d_lower, d_upper, d_ub_old, d_centerMovement, d_assignment, numLowerBounds, k, endNdx);
 
     /*cudaMemcpy(lower, d_lower, (n * k) * sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(upper, d_upper, n * sizeof(double), cudaMemcpyDeviceToHost);
@@ -275,6 +292,9 @@ void FB1_ElkanKmeans::free() {
     cudaFree(d_lower);
     cudaFree(d_ub_old);
     cudaFree(d_oldcenters);
+    cudaFree(d_upper);
+    cudaFree(d_oldcenter2newcenterDis);
+    cudaFree(d_clusterSize);
     delete centerCenterDistDiv2;
     delete lower;
     delete ub_old;
