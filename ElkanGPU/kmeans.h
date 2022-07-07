@@ -9,6 +9,10 @@
  * Kmeans is an abstract base class for algorithms which implement Lloyd's
  * k-means algorithm. Subclasses provide functionality in the "runThread()"
  * method.
+ * 
+ * https://github.com/kuanhsunchen/ElkanOpt
+ * 
+ * I added GPU Code
  */
 
 #include "dataset.h"

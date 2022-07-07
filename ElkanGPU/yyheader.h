@@ -1,8 +1,11 @@
+//https://github.com/ctaylor389/k_means_yinyang_gpu
+
 #pragma once
 #define DTYPE double
 #define dtype double
 #define BLOCKSIZE 256
 #define _HUGE_ENUF  1e+300
+#define BIG  999999999
 #define INFINITY   ((float)(_HUGE_ENUF * _HUGE_ENUF))
 
 //const int BLOCKSIZE = 256;

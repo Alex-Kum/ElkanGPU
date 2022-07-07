@@ -1,11 +1,3 @@
-/* Authors: Greg Hamerly and Jonathan Drake
- * Feedback: hamerly@cs.baylor.edu
- * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
- * Copyright 2014
- */
-
- // -lineinfo  cuda c++ comand line
-
 #include "ham_elkan.h"
 //#include "gpufunctions.h"
 #include "general_functions.h"
@@ -276,7 +268,7 @@ void HamElkan::update_bounds(int startNdx, int endNdx) {
     const int blockSize = 1 * 32;
     const int numBlocks = (n + blockSize - 1) / blockSize;
 
-   // updateBoundHamShared << <numBlocks, 258 >> > (x->d_data, d_lower, d_upper, d_centerMovement, d_assignment, numLowerBounds, d, k, endNdx);
+    updateBoundHamShared << <numBlocks, 258 >> > (x->d_data, d_lower, d_upper, d_centerMovement, d_assignment, numLowerBounds, d, k, endNdx);
     updateBoundHam << <numBlocks, blockSize >> > (x->d_data, d_lower, d_upper, d_centerMovement, d_assignment, numLowerBounds, d, k, endNdx);
 #else
     for (int i = startNdx; i < endNdx; ++i) {

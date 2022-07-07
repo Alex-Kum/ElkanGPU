@@ -5,6 +5,11 @@
  * Feedback: hamerly@cs.baylor.edu
  * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
  * Copyright 2014
+ * 
+ * https://github.com/kuanhsunchen/ElkanOpt
+ * 
+ * I added GPU Code
+ * 
  *
  * A Dataset class represents a collection of multidimensional records, as is
  * typical in metric machine learning. Every record has the same number of

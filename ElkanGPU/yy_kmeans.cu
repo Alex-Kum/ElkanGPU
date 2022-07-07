@@ -1,3 +1,6 @@
+//https://github.com/ctaylor389/k_means_yinyang_gpu
+
+
 //#include "yy_kmeans.h"
 //#include "gpufunctions.h"
 //
