@@ -2,20 +2,24 @@
  * Feedback: hamerly@cs.baylor.edu
  * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
  * Copyright 2014
+ * 
+ * https://github.com/kuanhsunchen/ElkanOpt
+ * 
+ * I added GPU Code
  */
 
 #include "MO_elkan_kmeans.h"
 #include "general_functions.h"
-#include "gpufunctions.h"
+//#include "gpufunctions.h"
 #include <cmath>
 #include <chrono>
  //using namespace std::chrono;
 
 #define Time 0
 #define Countdistance 0
-#define GPUA 1
-#define GPUB 1
-#define GPUC 1
+#define GPUA 0
+#define GPUB 0
+#define GPUC 0
 
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }

@@ -2,6 +2,10 @@
  * Feedback: hamerly@cs.baylor.edu
  * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
  * Copyright 2014
+ * 
+ * https://github.com/kuanhsunchen/ElkanOpt
+ * 
+ * I added GPU Code
  */
 
  // -lineinfo  cuda c++ comand line
@@ -319,6 +323,7 @@ void ElkanKmeans::update_bounds(int startNdx, int endNdx) {
     }
 #endif
 }
+
 
 void ElkanKmeans::initialize(Dataset const* aX, unsigned short aK, unsigned short* initialAssignment, int aNumThreads) {
     //std::cout << "ElkanKmeans init" << std::endl;

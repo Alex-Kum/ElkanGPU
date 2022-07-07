@@ -1,19 +1,13 @@
-/* Authors: Greg Hamerly and Jonathan Drake
- * Feedback: hamerly@cs.baylor.edu
- * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
- * Copyright 2014
- */
-
 #include "ham_elkanMO.h"
-//#include "gpufunctions.h"
+#include "gpufunctions.h"
 #include "general_functions.h"
 #include <cmath>
 #include <chrono>
 
-#define DISTANCES 0
-#define GPUA 0
-#define GPUB 0
-#define GPUC 0
+#define DISTANCES 1
+#define GPUA 1
+#define GPUB 1
+#define GPUC 1
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
@@ -101,6 +95,10 @@ int HamElkanMO::runThread(int threadId, int maxIterations) {
     gpuErrchk(cudaMemcpy(sumNewCenters[0]->d_data, sumNewCenters[0]->data, (k * d) * sizeof(double), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(d_clusterSize, clusterSize[0], k * sizeof(int), cudaMemcpyHostToDevice));
 
+    const int nRA = centers->n * centers->n;
+    const int blockSizeRA = 1 * 32;
+    const int numBlocksRA = (n + blockSizeRA - 1) / blockSizeRA;
+
     const int nC = endNdx * k;
     //std::cout << "nc: " << nC << std::endl;
     const int blockSizeC = 3 * 32;
@@ -125,11 +123,19 @@ int HamElkanMO::runThread(int threadId, int maxIterations) {
 #endif 
         ++iterations;
         *convergedd = true;
+        //if (iterations == 1) {
+        //    innerProdHam << <numBlocksRA, blockSizeRA >> > (d_centerCenterDistDiv2, d_s, centers->d_data, centers->d, centers->n);
+        //    //cudaMemset(d_maxoldcenterCenterDistDiv2, 0, k * sizeof(double));
 
-        update_center_dists(threadId);
+        //}
+        //else {
+            update_center_dists(threadId);
+        //}
+        
 
 
 #if GPUC  
+        
         //hammo
         elkanFunMOHam << <numBlocksD, blockSizeD >> > (x->d_data, centers->d_data, d_assignment,
             d_upper, d_s, d_centerCenterDistDiv2, d_maxoldcenter2newcenterDis, d_maxoldcenterCenterDistDiv2, d_ub_old, d_maxcenterMovement, k, d, endNdx, d_closest2, d_countDistances);
@@ -192,7 +198,7 @@ int HamElkanMO::runThread(int threadId, int maxIterations) {
         //cudaMemset(d_maxcenterMovement, 0.0, 1 * sizeof(double));
         elkanMoveCenterFB << <numBlocksM, blockSizeM >> > (d_centerMovement, d_clusterSize, centers->d_data, sumNewCenters[threadId]->d_data, d_oldcenters, d_converged, k, d, nM);
         //elkanMoveCenterMOHam << <numBlocksM, blockSizeM >> > (d_centerMovement, d_clusterSize, centers->d_data, sumNewCenters[threadId]->d_data, d_oldcenters, d_maxcenterMovement, d_converged, k, d, nM);
-        elkanMoveCenterMOHamMax << <k, 1 >> > (d_centerMovement, d_maxcenterMovement, k, nM);
+        elkanMoveCenterMOHamMax << <k, 1 >> > (d_centerMovement, d_maxcenterMovement, k, nM, d_s, d_maxoldcenterCenterDistDiv2);
         cudaMemcpy(convergedd, d_converged, 1 * sizeof(bool), cudaMemcpyDeviceToHost);
 
         const int n = centers->n * centers->n;

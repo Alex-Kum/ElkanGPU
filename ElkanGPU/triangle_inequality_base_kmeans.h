@@ -6,6 +6,10 @@
  * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
  * Copyright 2014
  *
+ * https://github.com/kuanhsunchen/ElkanOpt
+ * 
+ * I added GPU Code
+ * 
  * This class is an abstract base class for several other algorithms that use
  * upper & lower bounds to avoid distance calculations in k-means.
  */

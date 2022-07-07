@@ -1,16 +1,6 @@
 #ifndef MO_ELKAN_KMEANSHAM_H
 #define MO_ELKAN_KMEANSHAM_H
 
-/* Authors: Greg Hamerly and Jonathan Drake
- * Feedback: hamerly@cs.baylor.edu
- * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
- * Copyright 2014
- *
- * Elkan's k-means algorithm that uses k lower bounds per point to prune
- * distance calculations.
- */
-
-
 #include "triangle_inequality_base_kmeans.h"
 
 class HamElkanMO : public TriangleInequalityBaseKmeans {

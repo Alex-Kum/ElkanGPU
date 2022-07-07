@@ -1,3 +1,6 @@
+//https://github.com/ctaylor389/k_means_yinyang_gpu
+
+
 //#include "yy_kmean.h"
 //#include "gpufunctions.h"
 //#include "omp.h"
@@ -653,6 +656,10 @@
 //{
 //   //std::cout << "START SIMPLE" << std::endl;
 //   // variable initialization
+//    unsigned long long int* d_countDistances;
+//    cudaMalloc(&d_countDistances, 1 * sizeof(unsigned long long int));
+//    cudaMemset(d_countDistances, 0, 1 * sizeof(unsigned long long int));
+//
 //   int gpuIter;
 //   const int numGPUU = 1;
 //   int numPnts[numGPUU];
@@ -945,7 +952,7 @@
 //               devCentData[gpuIter],
 //               devMaxDriftArr[gpuIter],
 //               numPnts[gpuIter], numCent,
-//               numGrp, numDim);
+//               numGrp, numDim, d_countDistances);
 //       }
 //
 //       /*gpuErrchk(cudaMemcpy(pointInfo + (0 * numPnt / numGPU),
@@ -1041,7 +1048,9 @@
 //       sizeof(DTYPE) * numCent * numDim, cudaMemcpyDeviceToHost));
 //
 //   *ranIter = index;
-//
+//   unsigned long long int cDist;
+//   cudaMemcpy(&cDist, d_countDistances, 1 * sizeof(unsigned long long int), cudaMemcpyDeviceToHost);
+//   std::cout << "distance calculations: " << cDist << std::endl;
 //   // clean up, return
 //   for (gpuIter = 0; gpuIter < numGPU; gpuIter++)
 //   {

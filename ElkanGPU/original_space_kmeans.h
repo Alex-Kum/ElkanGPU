@@ -6,6 +6,10 @@
  * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
  * Copyright 2014
  *
+ * https://github.com/kuanhsunchen/ElkanOpt
+ * 
+ * I added GPU Code
+ * 
  * OriginalSpaceKmeans is a base class for other algorithms that operate in the
  * same space as the data being clustered (as opposed to kernelized k-means
  * algorithms, which operate in kernel space).

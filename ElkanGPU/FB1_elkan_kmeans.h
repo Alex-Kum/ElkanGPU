@@ -6,6 +6,10 @@
  * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
  * Copyright 2014
  *
+ * https://github.com/kuanhsunchen/ElkanOpt
+ * 
+ * I added GPU Code
+ * 
  * Elkan's k-means algorithm that uses k lower bounds per point to prune
  * distance calculations.
  */

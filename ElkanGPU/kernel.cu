@@ -190,11 +190,11 @@ int main(){
     //warumGehtNichts();
 
 
-   // cudaDeviceProp prop;
-   // cudaGetDeviceProperties(&prop, 0);
+    //cudaDeviceProp prop;
+    //cudaGetDeviceProperties(&prop, 0);
 
-    
-    //int clusters[] = { 4,16,64,265 };
+    //
+    ////int clusters[] = { 4,16,64,265 };
     //Dataset* x = loadDataset("KEGGNetwork_clean.data", 65554, 28);
     Dataset* x = loadDataset("USCensus_clean.data", 2458285, 68);
     //Dataset* x = loadDataset("gassensor_clean.data", 13910, 128);
@@ -205,7 +205,7 @@ int main(){
     cout << "Dataset loaded" << endl;
 
     vector< std::chrono::duration<double>> results;
-        int k = 64;
+        int k = 256;
         cout << "k: " << k << endl;
         Dataset* initialCenters = init_centers(*x, k);
         for (int i = 0; i < 1; i++) {                        
@@ -213,9 +213,9 @@ int main(){
             //HamElkan* alg = new HamElkan();
             //ElkanKmeans* alg = new ElkanKmeans();
             //FB1_ElkanKmeans* alg = new FB1_ElkanKmeans();
-            MO_ElkanKmeans* alg = new MO_ElkanKmeans();
+            //MO_ElkanKmeans* alg = new MO_ElkanKmeans();
             //HamElkanFB* alg = new HamElkanFB();
-            //HamElkanMO* alg = new HamElkanMO();
+            HamElkanMO* alg = new HamElkanMO();
             //CO_ElkanKmeans* alg = new CO_ElkanKmeans();
             std::cout << "Alg: " << alg->getName() << std::endl;
             //Dataset* x = load_dataset("C:\\Users\\Admin\\Desktop\\MASTER\\skin_nonskin.txt");
@@ -256,22 +256,22 @@ int main(){
     cudaDeviceReset();
 
      //!____________________________________________________________________________________________________________________________________________________
-    ///*const int numPnt = 499200;
-    //const int numCent = 10;
-    //const int numDim = 100;*/
-    //const int numPnt = 13910;    
-    //const int numCent = 100;
-    //const int numDim = 128;
-    ///*const int numPnt = 65554;
-    //const int numCent = 100;
-    //const int numDim = 28;*/
-    ///*const int numPnt = 2458285;
-    //const int numCent = 100;
-    //const int numDim = 68;*/
-    //const int numGrp = 10;
+   // /*const int numPnt = 499200;
+   // const int numCent = 10;
+   // const int numDim = 100;*/
+   // /*const int numPnt = 13910;    
+   // const int numCent = 100;
+   // const int numDim = 128;*/
+   // const int numPnt = 65554;
+   // const int numCent = 4;
+   // const int numDim = 28;
+   // /*const int numPnt = 2458285;
+   // const int numCent = 100;
+   // const int numDim = 68;*/
+   // const int numGrp = 4;
 
 
-    
+   // 
    // const  int numThread = 1;
    // const int maxIter = 5000;
    // const  int numGPU = 1;
@@ -306,7 +306,7 @@ int main(){
    // DTYPE* centData = (DTYPE*)malloc(sizeof(DTYPE) * numCent * numDim);
 
    // // generate centroid data using dataset points
-    //if (generateCentWithDataSame(centInfo, centData, pointData, numCent, numPnt, numDim))
+   // if (generateCentWithDataSame(centInfo, centData, pointData, numCent, numPnt, numDim))
    // {
    //     // signal erroneous exit
    //     printf("\nERROR: Could not generate centroids. Exiting program.\n");
@@ -355,9 +355,9 @@ int main(){
    // std::cout << "Sekunden: " << elapsed_seconds.count() << "\n";
    // std::cout << "ITERATIONS: " << ranIter << std::endl;
 
-   // for (int i = 0; i < 20; i++) {
+   // /*for (int i = 0; i < 20; i++) {
    //     std::cout << "Assignment: " << i << " -> " << pointInfo[i].centroidIndex << std::endl;
-   // }
+   // }*/
    // free(pointData);
    // free(centData);
    // free(pointInfo);

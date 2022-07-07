@@ -2,7 +2,11 @@
  * Feedback: hamerly@cs.baylor.edu
  * See: http://cs.baylor.edu/~hamerly/software/kmeans.php
  * Copyright 2014
- */
+ * 
+ * https://github.com/kuanhsunchen/ElkanOpt
+ * 
+ * I added GPU Code
+ *  */
 
 #include "dataset.h"
  // #include <iostream>
